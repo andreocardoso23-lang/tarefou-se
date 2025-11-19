@@ -404,6 +404,15 @@
                                 </div>
                             </div>
 
+                            <!-- NOVO CAMPO: RECORRÊNCIA -->
+                            <label for="taskRecurrence">Recorrência</label>
+                            <select id="taskRecurrence">
+                                <option value="Nenhuma">Nenhuma</option>
+                                <option value="Diária">Diária (seg a sex)</option>
+                                <option value="Semanal">Semanal (seg a sex)</option>
+                                <option value="Mensal">Mensal (seg a sex)</option>
+                            </select>
+
                             <label for="taskDescription">Descrição</label>
                             <textarea id="taskDescription"></textarea>
 
@@ -524,6 +533,13 @@
         return new Date(year, month - 1, day);
     }
 
+    function dateToISO(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
     // Garante o usuário padrão admin / 123 (Gestor)
     function ensureDefaultAdmin() {
         if (!users.some(u => u.username === 'admin')) {
@@ -549,10 +565,7 @@
 
     function getTodayStr() {
         const d = new Date();
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
+        return dateToISO(d);
     }
 
     // Força as tarefas atrasadas para hoje, marcando como Pendente
@@ -568,11 +581,7 @@
                 while (d < todayDate) {
                     d.setDate(d.getDate() + 1);
                 }
-                const newDateStr = [
-                    d.getFullYear(),
-                    String(d.getMonth() + 1).padStart(2, '0'),
-                    String(d.getDate()).padStart(2, '0')
-                ].join('-');
+                const newDateStr = dateToISO(d);
                 task.date = newDateStr;
                 task.status = 'Pendente';
                 changed = true;
@@ -600,6 +609,27 @@
         });
     }
 
+    // ============================== FORM DE TAREFA ============================
+
+    function resetTaskForm() {
+        const form = document.getElementById('taskForm');
+        if (form) form.reset();
+
+        const taskDateInput = document.getElementById('taskDate');
+        if (taskDateInput) taskDateInput.value = getTodayStr();
+
+        const recurrenceSelect = document.getElementById('taskRecurrence');
+        if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
+
+        editingTaskId = null;
+
+        const submitBtn = document.getElementById('taskSubmitBtn');
+        if (submitBtn) submitBtn.textContent = 'Salvar tarefa';
+
+        const delBtn = document.getElementById('taskDeleteBtn');
+        if (delBtn) delBtn.style.display = 'none';
+    }
+
     // ============================== LOGIN / SESSÃO ============================
 
     function showLogin() {
@@ -616,6 +646,12 @@
         // Esconde link Usuários se não for Gestor
         document.getElementById('nav-users').style.display =
             currentUser.role === 'Gestor' ? 'inline-block' : 'none';
+
+        // Ao logar: seleciona data de hoje para "Tarefas do dia"
+        selectedDate = getTodayStr();
+
+        // Limpa o formulário de tarefas ao entrar
+        resetTaskForm();
 
         refreshAllUI();
     }
@@ -721,7 +757,6 @@
         container.innerHTML = html;
     }
 
-    // 🔹 AGORA COM PLACEHOLDER E SEM SELEÇÃO AUTOMÁTICA
     function renderUserSelect() {
         const select = document.getElementById('taskUser');
         if (!select) return;
@@ -919,7 +954,6 @@
         container.innerHTML = html;
     }
 
-    // 🔹 AGORA COM PLACEHOLDER E SEM SELEÇÃO AUTOMÁTICA
     function renderCompanySelect() {
         const select = document.getElementById('taskCompany');
         if (!select) return;
@@ -986,6 +1020,76 @@
 
     // ============================ TAREFAS ====================================
 
+    function createTaskClone(baseTask, dateStr) {
+        const clone = {
+            id: generateId(),
+            title: baseTask.title,
+            date: dateStr,
+            responsible: baseTask.responsible,
+            companyId: baseTask.companyId,
+            status: baseTask.status,
+            priority: baseTask.priority,
+            description: baseTask.description,
+            recurrence: baseTask.recurrence
+        };
+        tasks.push(clone);
+    }
+
+    function generateRecurrenceTasks(baseTask) {
+        const recurrence = baseTask.recurrence || 'Nenhuma';
+        if (recurrence === 'Nenhuma') return;
+        if (!baseTask.date) return;
+
+        const startDate = parseLocalDate(baseTask.date);
+        if (!startDate) return;
+
+        const year = startDate.getFullYear();
+
+        // Helper: verifica se é dia útil (segunda a sexta)
+        function isWeekday(d) {
+            const day = d.getDay(); // 0 domingo, 6 sábado
+            return day >= 1 && day <= 5;
+        }
+
+        if (recurrence === 'Diária') {
+            let d = new Date(startDate);
+            while (true) {
+                d.setDate(d.getDate() + 1);
+                if (d.getFullYear() !== year) break;
+                if (isWeekday(d)) {
+                    createTaskClone(baseTask, dateToISO(d));
+                }
+            }
+        } else if (recurrence === 'Semanal') {
+            let d = new Date(startDate);
+            while (true) {
+                d.setDate(d.getDate() + 7);
+                if (d.getFullYear() !== year) break;
+                if (isWeekday(d)) {
+                    createTaskClone(baseTask, dateToISO(d));
+                }
+            }
+        } else if (recurrence === 'Mensal') {
+            const originalDay = startDate.getDate();
+            let month = startDate.getMonth() + 1; // próximo mês
+            while (true) {
+                const d = new Date(year, month, originalDay);
+                if (d.getFullYear() !== year) break;
+                // se o dia "virar" de mês (ex: 31 em fevereiro), ignora
+                if (d.getMonth() !== month) {
+                    month++;
+                    if (month > 11) break;
+                    continue;
+                }
+                if (isWeekday(d)) {
+                    createTaskClone(baseTask, dateToISO(d));
+                }
+                month++;
+                if (month > 11) break;
+            }
+        }
+    }
+
     function handleTaskForm(event) {
         event.preventDefault();
         const title = document.getElementById('taskTitle').value.trim();
@@ -995,6 +1099,7 @@
         const status = document.getElementById('taskStatus').value;
         const priority = document.getElementById('taskPriority').value;
         const description = document.getElementById('taskDescription').value.trim();
+        const recurrence = document.getElementById('taskRecurrence').value || 'Nenhuma';
 
         if (!title || !date || !responsible || !companyId) {
             alert('Preencha todos os campos obrigatórios.');
@@ -1013,15 +1118,12 @@
                 task.status = status;
                 task.priority = priority;
                 task.description = description;
+                task.recurrence = recurrence;
             }
             saveTasks();
-            editingTaskId = null;
-            document.getElementById('taskForm').reset();
-            document.getElementById('taskDate').value = getTodayStr();
-            document.getElementById('taskSubmitBtn').textContent = 'Salvar tarefa';
-            document.getElementById('taskDeleteBtn').style.display = 'none';
+            resetTaskForm();
         } else {
-            const task = {
+            const baseTask = {
                 id: generateId(),
                 title,
                 date,
@@ -1029,13 +1131,16 @@
                 companyId,
                 status,
                 priority,
-                description
+                description,
+                recurrence
             };
-            tasks.push(task);
-            saveTasks();
+            tasks.push(baseTask);
 
-            document.getElementById('taskForm').reset();
-            document.getElementById('taskDate').value = getTodayStr();
+            // Gera recorrências somente dentro do mesmo ano, de segunda a sexta
+            generateRecurrenceTasks(baseTask);
+
+            saveTasks();
+            resetTaskForm();
         }
 
         renderTasksTable();
@@ -1049,11 +1154,7 @@
     function deleteCurrentEditingTask() {
         if (!editingTaskId) return;
         deleteTask(editingTaskId);
-        editingTaskId = null;
-        document.getElementById('taskForm').reset();
-        document.getElementById('taskDate').value = getTodayStr();
-        document.getElementById('taskSubmitBtn').textContent = 'Salvar tarefa';
-        document.getElementById('taskDeleteBtn').style.display = 'none';
+        resetTaskForm();
     }
 
     function renderTasksTable() {
@@ -1235,11 +1336,7 @@
     function buildCalendarDayCell(day, monthLength, tasksByDay, todayStr) {
         if (day > monthLength) return '<td></td>';
         const d = new Date(currentYear, currentMonth, day);
-        const dateStr = [
-            d.getFullYear(),
-            String(d.getMonth() + 1).padStart(2, '0'),
-            String(d.getDate()).padStart(2, '0')
-        ].join('-');
+        const dateStr = dateToISO(d);
         const isToday = dateStr === todayStr;
         const hasTasks = !!tasksByDay[day];
         const isSelected = selectedDate === dateStr;
@@ -1325,6 +1422,7 @@
         document.getElementById('taskStatus').value = t.status;
         document.getElementById('taskPriority').value = t.priority;
         document.getElementById('taskDescription').value = t.description || '';
+        document.getElementById('taskRecurrence').value = t.recurrence || 'Nenhuma';
 
         document.getElementById('taskSubmitBtn').textContent = 'Atualizar tarefa';
 
@@ -1365,6 +1463,9 @@
         taskDateInput.addEventListener('focus', fillTodayIfEmpty);
         taskDateInput.addEventListener('click', fillTodayIfEmpty);
         taskDateInput.value = getTodayStr();
+
+        const recurrenceSelect = document.getElementById('taskRecurrence');
+        if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
     });
 </script>
 
