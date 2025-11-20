@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>Tarefou-se! - Tarefas</title>
+
+    <!-- Firebase (versão compat para uso simples em HTML) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
     <style>
         * {
             box-sizing: border-box;
@@ -491,6 +496,23 @@
 </div>
 
 <script>
+    // ========================== FIREBASE CONFIG ==========================
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAtUE0oNAyM4_ZGqqAPdCyEKTsCh9Zxz2o",
+        authDomain: "tarefou-se.firebaseapp.com",
+        databaseURL: "https://tarefou-se-default-rtdb.firebaseio.com",
+        projectId: "tarefou-se",
+        storageBucket: "tarefou-se.firebasestorage.app",
+        messagingSenderId: "967193019294",
+        appId: "1:967193019294:web:7b029d1027633c52d48c8f",
+        measurementId: "G-MTQ1H1QQSX"
+    };
+
+    // Inicializa Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
     // ========================== DADOS & UTILITÁRIOS ==========================
 
     let users = [];
@@ -506,20 +528,39 @@
     let editingCompanyId = null;
     let editingTaskId = null; // controla edição de tarefa
 
+    // Agora esses saves salvam no Firestore (multiusuário)
     function saveUsers() {
-        localStorage.setItem('miniERP_users', JSON.stringify(users));
+        users.forEach(u => {
+            db.collection('users').doc(u.id).set(u);
+        });
     }
     function saveCompanies() {
-        localStorage.setItem('miniERP_companies', JSON.stringify(companies));
+        companies.forEach(c => {
+            db.collection('companies').doc(c.id).set(c);
+        });
     }
     function saveTasks() {
-        localStorage.setItem('miniERP_tasks', JSON.stringify(tasks));
+        tasks.forEach(t => {
+            db.collection('tasks').doc(t.id).set(t);
+        });
     }
 
-    function loadData() {
-        users = JSON.parse(localStorage.getItem('miniERP_users') || '[]');
-        companies = JSON.parse(localStorage.getItem('miniERP_companies') || '[]');
-        tasks = JSON.parse(localStorage.getItem('miniERP_tasks') || '[]');
+    // Carrega tudo do Firestore
+    async function loadData() {
+        // Usuários
+        const usersSnapshot = await db.collection('users').get();
+        users = [];
+        usersSnapshot.forEach(doc => users.push(doc.data()));
+
+        // Empresas
+        const companiesSnapshot = await db.collection('companies').get();
+        companies = [];
+        companiesSnapshot.forEach(doc => companies.push(doc.data()));
+
+        // Tarefas
+        const tasksSnapshot = await db.collection('tasks').get();
+        tasks = [];
+        tasksSnapshot.forEach(doc => tasks.push(doc.data()));
     }
 
     // parser de data como LOCAL (evita cair no dia anterior por causa do fuso)
@@ -589,7 +630,7 @@
         });
 
         if (changed) {
-            saveTasks();
+            saveTasks(); // salva atualização no Firestore
         }
     }
 
@@ -656,7 +697,7 @@
         refreshAllUI();
     }
 
-    function handleLogin(event) {
+    async function handleLogin(event) {
         event.preventDefault();
         const user = document.getElementById('loginUser').value.trim();
         const pass = document.getElementById('loginPass').value;
@@ -809,11 +850,11 @@
             if (u) {
                 u.password = password;
                 u.role = role;
+                db.collection('users').doc(u.id).set(u);
             }
             editingUserId = null;
             nameInput.disabled = false;
             submitBtn.textContent = 'Salvar usuário';
-            saveUsers();
             document.getElementById('userForm').reset();
             renderUsersTable();
             renderUserSelect();
@@ -836,13 +877,14 @@
             return;
         }
 
-        users.push({
+        const newUser = {
             id: generateId(),
             username: name,
             password: password,
             role: role
-        });
-        saveUsers();
+        };
+        users.push(newUser);
+        db.collection('users').doc(newUser.id).set(newUser);
 
         document.getElementById('userForm').reset();
         renderUsersTable();
@@ -884,7 +926,7 @@
         if (!confirm('Deseja realmente excluir este usuário?')) return;
 
         users = users.filter(us => us.id !== id);
-        saveUsers();
+        db.collection('users').doc(id).delete();
         renderUsersTable();
         renderUserSelect();
     }
@@ -909,17 +951,21 @@
                 return;
             }
             const c = companies.find(c => c.id === editingCompanyId);
-            if (c) c.name = name;
+            if (c) {
+                c.name = name;
+                db.collection('companies').doc(c.id).set(c);
+            }
             editingCompanyId = null;
             submitBtn.textContent = 'Adicionar empresa';
         } else {
-            companies.push({
+            const newCompany = {
                 id: generateId(),
                 name: name
-            });
+            };
+            companies.push(newCompany);
+            db.collection('companies').doc(newCompany.id).set(newCompany);
         }
 
-        saveCompanies();
         document.getElementById('companyForm').reset();
         renderCompaniesTable();
         renderCompanySelect();
@@ -1013,7 +1059,7 @@
         }
         if (!confirm('Deseja realmente excluir esta empresa?')) return;
         companies = companies.filter(c => c.id !== id);
-        saveCompanies();
+        db.collection('companies').doc(id).delete();
         renderCompaniesTable();
         renderCompanySelect();
     }
@@ -1033,6 +1079,7 @@
             recurrence: baseTask.recurrence
         };
         tasks.push(clone);
+        db.collection('tasks').doc(clone.id).set(clone);
     }
 
     function generateRecurrenceTasks(baseTask) {
@@ -1045,7 +1092,6 @@
 
         const year = startDate.getFullYear();
 
-        // Helper: verifica se é dia útil (segunda a sexta)
         function isWeekday(d) {
             const day = d.getDay(); // 0 domingo, 6 sábado
             return day >= 1 && day <= 5;
@@ -1075,7 +1121,6 @@
             while (true) {
                 const d = new Date(year, month, originalDay);
                 if (d.getFullYear() !== year) break;
-                // se o dia "virar" de mês (ex: 31 em fevereiro), ignora
                 if (d.getMonth() !== month) {
                     month++;
                     if (month > 11) break;
@@ -1119,8 +1164,8 @@
                 task.priority = priority;
                 task.description = description;
                 task.recurrence = recurrence;
+                db.collection('tasks').doc(task.id).set(task);
             }
-            saveTasks();
             resetTaskForm();
         } else {
             const baseTask = {
@@ -1135,12 +1180,9 @@
                 recurrence
             };
             tasks.push(baseTask);
+            db.collection('tasks').doc(baseTask.id).set(baseTask);
 
-            // Gera recorrências somente dentro do mesmo ano, de segunda a sexta
             generateRecurrenceTasks(baseTask);
-
-            saveTasks();
-            resetTaskForm();
         }
 
         renderTasksTable();
@@ -1208,7 +1250,7 @@
         const t = tasks.find(t => t.id === id);
         if (!t) return;
         t.status = newStatus;
-        saveTasks();
+        db.collection('tasks').doc(t.id).set(t);
         renderTasksOverview();
         renderCalendar();
         if (selectedDate) renderDayTasks(selectedDate);
@@ -1218,7 +1260,7 @@
         const t = tasks.find(t => t.id === id);
         if (!t) return;
         t.priority = newPriority;
-        saveTasks();
+        db.collection('tasks').doc(t.id).set(t);
         renderTasksOverview();
         renderCalendar();
         if (selectedDate) renderDayTasks(selectedDate);
@@ -1231,7 +1273,7 @@
         }
         if (!confirm('Deseja realmente excluir esta tarefa?')) return;
         tasks = tasks.filter(t => t.id !== id);
-        saveTasks();
+        db.collection('tasks').doc(id).delete();
         renderTasksTable();
         renderTasksOverview();
         renderCalendar();
@@ -1436,8 +1478,9 @@
 
     // ============================ INICIALIZAÇÃO ==============================
 
-    document.addEventListener('DOMContentLoaded', function () {
-        loadData();
+    document.addEventListener('DOMContentLoaded', async function () {
+        // Carrega dados do Firestore (multiusuário)
+        await loadData();
         ensureDefaultAdmin();
 
         const savedUser = localStorage.getItem('miniERP_currentUser');
