@@ -353,7 +353,7 @@
         <!-- DASHBOARD -->
         <section id="dashboardSection" class="section active">
             <div class="grid">
-                <!-- Calendário -->
+                <!-- Calendário + Tarefas em andamento -->
                 <div class="calendar-container">
                     <div class="calendar-header">
                         <button class="btn-secondary" onclick="changeMonth(-1)">&lt;</button>
@@ -361,6 +361,14 @@
                         <button class="btn-secondary" onclick="changeMonth(1)">&gt;</button>
                     </div>
                     <div class="calendar" id="calendar"></div>
+
+                    <!-- Tarefas em andamento -->
+                    <div class="card" style="margin-top:10px;">
+                        <h2>Tarefas em andamento</h2>
+                        <div id="inProgressList" class="small-text">
+                            Nenhuma tarefa em andamento.
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Lado direito: Cadastro + Tarefas do dia -->
@@ -843,6 +851,7 @@
         renderCompaniesTable();
         renderUsersTable();
         renderCalendar();
+        renderInProgressTasks();
         if (selectedDate) {
             renderDayTasks(selectedDate);
         }
@@ -1303,6 +1312,7 @@
         renderTasksTable();
         renderTasksOverview();
         renderCalendar();
+        renderInProgressTasks();
         if (selectedDate) {
             renderDayTasks(selectedDate);
         }
@@ -1462,6 +1472,7 @@
 
         renderTasksOverview();
         renderCalendar();
+        renderInProgressTasks();
         if (selectedDate) renderDayTasks(selectedDate);
         renderTasksTable();
     }
@@ -1473,6 +1484,7 @@
         db.collection('tasks').doc(t.id).set(t);
         renderTasksOverview();
         renderCalendar();
+        renderInProgressTasks();
         if (selectedDate) renderDayTasks(selectedDate);
         renderTasksTable();
     }
@@ -1494,6 +1506,7 @@
         renderTasksTable();
         renderTasksOverview();
         renderCalendar();
+        renderInProgressTasks();
         if (selectedDate) renderDayTasks(selectedDate);
     }
 
@@ -1517,6 +1530,43 @@
             html += `<tr>
                 <td>${formatDateBR(t.date)}</td>
                 <td>${t.title}</td>
+                <td>${t.responsible}</td>
+                <td>${getCompanyNameById(t.companyId)}</td>
+                <td><span class="tag ${statusClass}">${t.status}</span></td>
+                <td><span class="tag ${priorityClass}">${t.priority}</span></td>
+            </tr>`;
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    // ============================ LISTA EM ANDAMENTO =========================
+    // Colunas: Título, Data, Responsável, Empresa, Status, Prioridade
+    function renderInProgressTasks() {
+        const container = document.getElementById('inProgressList');
+        if (!container) return;
+
+        const list = sortTasks(
+            getVisibleTasks().filter(t => t.status === 'Em andamento')
+        );
+
+        if (!list.length) {
+            container.innerHTML = 'Nenhuma tarefa em andamento.';
+            return;
+        }
+
+        let html = '<table><thead><tr>' +
+            '<th>Título</th><th>Data</th><th>Responsável</th><th>Empresa</th><th>Status</th><th>Prioridade</th>' +
+            '</tr></thead><tbody>';
+
+        list.forEach(t => {
+            const statusClass = 'tag-' + t.status.replace(/\s+/g, '-');
+            const priorityClass = 'tag-' + t.priority;
+
+            html += `<tr class="clickable-row" onclick="selectTaskForEdit('${t.id}')">
+                <td>${t.title}</td>
+                <td>${formatDateBR(t.date)}</td>
                 <td>${t.responsible}</td>
                 <td>${getCompanyNameById(t.companyId)}</td>
                 <td><span class="tag ${statusClass}">${t.status}</span></td>
@@ -1627,6 +1677,7 @@
         document.getElementById('dayTasksList').innerHTML =
             '<span class="small-text">Selecione um dia no calendário para ver as tarefas.</span>';
         renderCalendar();
+        renderInProgressTasks();
     }
 
     function selectDate(dateStr) {
