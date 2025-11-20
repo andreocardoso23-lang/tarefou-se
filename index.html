@@ -208,7 +208,7 @@
         .tag-Baixa { background: #28a745; }
 
         .tag-Aberto { background: #17a2b8; }
-        .tag-Em\ andamento { background: #6f42c1; }
+        .tag-Em-andamento { background: #6f42c1; }
         .tag-Concluído { background: #28a745; }
         .tag-Pendente { background: #fd7e14; }
 
@@ -339,6 +339,7 @@
         <nav>
             <a id="nav-dashboard" onclick="showSection('dashboardSection')" class="active">Dashboard</a>
             <a id="nav-companies" onclick="showSection('companiesSection')">Empresas</a>
+            <a id="nav-tasks" onclick="showSection('tasksSection')">Tarefas</a>
             <a id="nav-users" onclick="showSection('usersSection')">Usuários</a>
         </nav>
         <div class="user-info">
@@ -409,7 +410,6 @@
                                 </div>
                             </div>
 
-                            <!-- NOVO CAMPO: RECORRÊNCIA -->
                             <label for="taskRecurrence">Recorrência</label>
                             <select id="taskRecurrence">
                                 <option value="Nenhuma">Nenhuma</option>
@@ -422,6 +422,11 @@
                             <textarea id="taskDescription"></textarea>
 
                             <button type="submit" id="taskSubmitBtn">Salvar tarefa</button>
+                            <button type="button" id="taskCancelBtn" class="btn-secondary"
+                                    style="display:none; margin-left:8px;"
+                                    onclick="cancelTaskEdit()">
+                                Voltar
+                            </button>
                             <button type="button" id="taskDeleteBtn" class="btn-secondary"
                                     style="display:none; margin-left:8px;"
                                     onclick="deleteCurrentEditingTask()">
@@ -454,6 +459,32 @@
             <div class="card">
                 <h2>Empresas cadastradas</h2>
                 <div id="companiesTable"></div>
+            </div>
+        </section>
+
+        <!-- TAREFAS (apenas Gestor) -->
+        <section id="tasksSection" class="section">
+            <div class="card">
+                <h2>Todas as tarefas (apenas Gestor)</h2>
+
+                <!-- Filtro de período + botões -->
+                <div class="flex-row" style="margin-bottom:10px; flex-wrap:wrap; align-items:flex-end;">
+                    <div class="flex-1">
+                        <label for="filterStartDate">Data inicial</label>
+                        <input type="date" id="filterStartDate">
+                    </div>
+                    <div class="flex-1">
+                        <label for="filterEndDate">Data final</label>
+                        <input type="date" id="filterEndDate">
+                    </div>
+                    <div style="display:flex; gap:8px; margin-bottom:10px;">
+                        <button type="button" onclick="applyTaskDateFilter()">Filtrar</button>
+                        <button type="button" class="btn-secondary" onclick="clearTaskDateFilter()">Limpar</button>
+                        <button type="button" onclick="exportTasksToExcel()">Baixar Excel</button>
+                    </div>
+                </div>
+
+                <div id="tasksTable"></div>
             </div>
         </section>
 
@@ -509,7 +540,6 @@
         measurementId: "G-MTQ1H1QQSX"
     };
 
-    // Inicializa Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
@@ -526,9 +556,12 @@
 
     let editingUserId = null;
     let editingCompanyId = null;
-    let editingTaskId = null; // controla edição de tarefa
+    let editingTaskId = null;
 
-    // Agora esses saves salvam no Firestore (multiusuário)
+    // Filtro de período na página Tarefas
+    let taskFilterStart = null; // 'YYYY-MM-DD' ou null
+    let taskFilterEnd = null;
+
     function saveUsers() {
         users.forEach(u => {
             db.collection('users').doc(u.id).set(u);
@@ -545,25 +578,20 @@
         });
     }
 
-    // Carrega tudo do Firestore
     async function loadData() {
-        // Usuários
         const usersSnapshot = await db.collection('users').get();
         users = [];
         usersSnapshot.forEach(doc => users.push(doc.data()));
 
-        // Empresas
         const companiesSnapshot = await db.collection('companies').get();
         companies = [];
         companiesSnapshot.forEach(doc => companies.push(doc.data()));
 
-        // Tarefas
         const tasksSnapshot = await db.collection('tasks').get();
         tasks = [];
         tasksSnapshot.forEach(doc => tasks.push(doc.data()));
     }
 
-    // parser de data como LOCAL (evita cair no dia anterior por causa do fuso)
     function parseLocalDate(dateStr) {
         if (!dateStr) return null;
         const parts = dateStr.split('-');
@@ -581,7 +609,6 @@
         return `${y}-${m}-${day}`;
     }
 
-    // Garante o usuário padrão admin / 123 (Gestor)
     function ensureDefaultAdmin() {
         if (!users.some(u => u.username === 'admin')) {
             users.push({
@@ -609,7 +636,42 @@
         return dateToISO(d);
     }
 
-    // Força as tarefas atrasadas para hoje, marcando como Pendente
+    function formatTimeSpent(ms) {
+        if (!ms || ms <= 0) return '-';
+        const totalSeconds = Math.floor(ms / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        if (hours > 0) {
+            return `${hours}h ${minutes}min`;
+        }
+        return `${minutes}min`;
+    }
+
+    function applyStatusChange(task, newStatus) {
+        const now = Date.now();
+
+        if (typeof task.timeSpentMs !== 'number') {
+            task.timeSpentMs = 0;
+        }
+        if (typeof task.currentStart !== 'number') {
+            task.currentStart = null;
+        }
+
+        const oldStatus = task.status || 'Aberto';
+        if (oldStatus === newStatus) return;
+
+        if (oldStatus === 'Em andamento' && task.currentStart) {
+            task.timeSpentMs += now - task.currentStart;
+            task.currentStart = null;
+        }
+
+        if (newStatus === 'Em andamento') {
+            task.currentStart = now;
+        }
+
+        task.status = newStatus;
+    }
+
     function applyAutoCarryOver() {
         const todayStr = getTodayStr();
         const todayDate = parseLocalDate(todayStr);
@@ -624,13 +686,14 @@
                 }
                 const newDateStr = dateToISO(d);
                 task.date = newDateStr;
-                task.status = 'Pendente';
+
+                applyStatusChange(task, 'Pendente');
                 changed = true;
             }
         });
 
         if (changed) {
-            saveTasks(); // salva atualização no Firestore
+            saveTasks();
         }
     }
 
@@ -662,6 +725,16 @@
         const recurrenceSelect = document.getElementById('taskRecurrence');
         if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
 
+        const userSelect = document.getElementById('taskUser');
+        if (userSelect && userSelect.options.length > 0) {
+            userSelect.selectedIndex = 0;
+        }
+
+        const companySelect = document.getElementById('taskCompany');
+        if (companySelect && companySelect.options.length > 0) {
+            companySelect.selectedIndex = 0;
+        }
+
         editingTaskId = null;
 
         const submitBtn = document.getElementById('taskSubmitBtn');
@@ -669,6 +742,13 @@
 
         const delBtn = document.getElementById('taskDeleteBtn');
         if (delBtn) delBtn.style.display = 'none';
+
+        const cancelBtn = document.getElementById('taskCancelBtn');
+        if (cancelBtn) cancelBtn.style.display = 'none';
+    }
+
+    function cancelTaskEdit() {
+        resetTaskForm();
     }
 
     // ============================== LOGIN / SESSÃO ============================
@@ -684,16 +764,14 @@
         document.getElementById('currentUserInfo').innerText =
             currentUser.username + ' (' + currentUser.role + ')';
 
-        // Esconde link Usuários se não for Gestor
         document.getElementById('nav-users').style.display =
             currentUser.role === 'Gestor' ? 'inline-block' : 'none';
 
-        // Ao logar: seleciona data de hoje para "Tarefas do dia"
+        document.getElementById('nav-tasks').style.display =
+            currentUser.role === 'Gestor' ? 'inline-block' : 'none';
+
         selectedDate = getTodayStr();
-
-        // Limpa o formulário de tarefas ao entrar
         resetTaskForm();
-
         refreshAllUI();
     }
 
@@ -731,6 +809,11 @@
     // ============================== NAVEGAÇÃO ================================
 
     function showSection(sectionId) {
+        if (sectionId === 'tasksSection' && (!currentUser || currentUser.role !== 'Gestor')) {
+            alert('Apenas Gestores podem visualizar a página de tarefas.');
+            sectionId = 'dashboardSection';
+        }
+
         const sections = document.querySelectorAll('.section');
         sections.forEach(sec => sec.classList.remove('active'));
 
@@ -743,6 +826,8 @@
             document.getElementById('nav-dashboard').classList.add('active');
         } else if (sectionId === 'companiesSection') {
             document.getElementById('nav-companies').classList.add('active');
+        } else if (sectionId === 'tasksSection') {
+            document.getElementById('nav-tasks').classList.add('active');
         } else if (sectionId === 'usersSection') {
             document.getElementById('nav-users').classList.add('active');
         }
@@ -803,6 +888,17 @@
         if (!select) return;
         select.innerHTML = '';
 
+        if (!currentUser) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Faça login para selecionar';
+            opt.disabled = true;
+            opt.selected = true;
+            select.appendChild(opt);
+            select.disabled = true;
+            return;
+        }
+
         if (!users.length) {
             const opt = document.createElement('option');
             opt.value = '';
@@ -821,12 +917,22 @@
         placeholder.selected = true;
         select.appendChild(placeholder);
 
-        users.forEach(u => {
-            const opt = document.createElement('option');
-            opt.value = u.username;
-            opt.textContent = `${u.username} (${u.role})`;
-            select.appendChild(opt);
-        });
+        if (currentUser.role === 'Operador') {
+            const u = users.find(u => u.id === currentUser.id || u.username === currentUser.username);
+            if (u) {
+                const opt = document.createElement('option');
+                opt.value = u.username;
+                opt.textContent = `${u.username} (${u.role})`;
+                select.appendChild(opt);
+            }
+        } else {
+            users.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.username;
+                opt.textContent = `${u.username} (${u.role})`;
+                select.appendChild(opt);
+            });
+        }
     }
 
     function handleUserForm(event) {
@@ -840,7 +946,6 @@
         const password = passwordInput.value;
         const role = roleSelect.value;
 
-        // Edição: somente admin
         if (editingUserId) {
             if (!currentUser || currentUser.username !== 'admin') {
                 alert('Somente o usuário admin pode alterar usuários.');
@@ -861,7 +966,6 @@
             return;
         }
 
-        // Criação: somente Gestor
         if (currentUser.role !== 'Gestor') {
             alert('Somente Gestores podem cadastrar usuários.');
             return;
@@ -906,7 +1010,7 @@
         const submitBtn = document.getElementById('userSubmitBtn');
 
         nameInput.value = u.username;
-        nameInput.disabled = true; // não permite alterar o nome
+        nameInput.disabled = true;
         passwordInput.value = u.password || '';
         roleSelect.value = u.role;
         submitBtn.textContent = 'Atualizar usuário';
@@ -945,7 +1049,6 @@
         }
 
         if (editingCompanyId) {
-            // Alterar empresa: somente admin
             if (!currentUser || currentUser.username !== 'admin') {
                 alert('Somente o usuário admin pode alterar empresas.');
                 return;
@@ -1076,7 +1179,9 @@
             status: baseTask.status,
             priority: baseTask.priority,
             description: baseTask.description,
-            recurrence: baseTask.recurrence
+            recurrence: baseTask.recurrence,
+            timeSpentMs: 0,
+            currentStart: null
         };
         tasks.push(clone);
         db.collection('tasks').doc(clone.id).set(clone);
@@ -1093,7 +1198,7 @@
         const year = startDate.getFullYear();
 
         function isWeekday(d) {
-            const day = d.getDay(); // 0 domingo, 6 sábado
+            const day = d.getDay();
             return day >= 1 && day <= 5;
         }
 
@@ -1117,7 +1222,7 @@
             }
         } else if (recurrence === 'Mensal') {
             const originalDay = startDate.getDate();
-            let month = startDate.getMonth() + 1; // próximo mês
+            let month = startDate.getMonth() + 1;
             while (true) {
                 const d = new Date(year, month, originalDay);
                 if (d.getFullYear() !== year) break;
@@ -1156,18 +1261,20 @@
             if (!task) {
                 alert('Tarefa não encontrada para edição.');
             } else {
+                applyStatusChange(task, status);
+
                 task.title = title;
                 task.date = date;
                 task.responsible = responsible;
                 task.companyId = companyId;
-                task.status = status;
                 task.priority = priority;
                 task.description = description;
                 task.recurrence = recurrence;
+
                 db.collection('tasks').doc(task.id).set(task);
             }
-            resetTaskForm();
         } else {
+            const now = Date.now();
             const baseTask = {
                 id: generateId(),
                 title,
@@ -1177,14 +1284,22 @@
                 status,
                 priority,
                 description,
-                recurrence
+                recurrence,
+                timeSpentMs: 0,
+                currentStart: null
             };
+
+            if (status === 'Em andamento') {
+                baseTask.currentStart = now;
+            }
+
             tasks.push(baseTask);
             db.collection('tasks').doc(baseTask.id).set(baseTask);
 
             generateRecurrenceTasks(baseTask);
         }
 
+        resetTaskForm();
         renderTasksTable();
         renderTasksOverview();
         renderCalendar();
@@ -1199,43 +1314,135 @@
         resetTaskForm();
     }
 
+    // Aplica filtro de período na lista de tarefas (para página Tarefas / export)
+    function getFilteredTasksList() {
+        let visible = sortTasks(getVisibleTasks());
+
+        if (taskFilterStart || taskFilterEnd) {
+            visible = visible.filter(t => {
+                if (!t.date) return false;
+                if (taskFilterStart && t.date < taskFilterStart) return false;
+                if (taskFilterEnd && t.date > taskFilterEnd) return false;
+                return true;
+            });
+        }
+
+        return visible;
+    }
+
+    function applyTaskDateFilter() {
+        const startInput = document.getElementById('filterStartDate');
+        const endInput = document.getElementById('filterEndDate');
+        taskFilterStart = startInput.value || null;
+        taskFilterEnd = endInput.value || null;
+        renderTasksTable();
+    }
+
+    function clearTaskDateFilter() {
+        taskFilterStart = null;
+        taskFilterEnd = null;
+        const startInput = document.getElementById('filterStartDate');
+        const endInput = document.getElementById('filterEndDate');
+        if (startInput) startInput.value = '';
+        if (endInput) endInput.value = '';
+        renderTasksTable();
+    }
+
+    // Exportar tarefas para "Excel" (arquivo .xls com tabela HTML)
+    function exportTasksToExcel() {
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Apenas Gestores podem exportar as tarefas.');
+            return;
+        }
+
+        const list = getFilteredTasksList();
+        if (!list.length) {
+            alert('Não há tarefas para exportar nesse período.');
+            return;
+        }
+
+        let tableHtml = '<table border="1"><thead><tr>' +
+            '<th>Título</th>' +
+            '<th>Data</th>' +
+            '<th>Responsável</th>' +
+            '<th>Empresa</th>' +
+            '<th>Status</th>' +
+            '<th>Prioridade</th>' +
+            '<th>Recorrência</th>' +
+            '<th>Tempo Em andamento</th>' +
+            '<th>Descrição</th>' +
+            '</tr></thead><tbody>';
+
+        list.forEach(t => {
+            const companyName = getCompanyNameById(t.companyId);
+            const timeText = formatTimeSpent(t.timeSpentMs || 0);
+
+            tableHtml += '<tr>' +
+                `<td>${(t.title || '').replace(/<\/?[^>]+(>|$)/g, '')}</td>` +
+                `<td>${formatDateBR(t.date || '')}</td>` +
+                `<td>${t.responsible || ''}</td>` +
+                `<td>${companyName || ''}</td>` +
+                `<td>${t.status || ''}</td>` +
+                `<td>${t.priority || ''}</td>` +
+                `<td>${t.recurrence || 'Nenhuma'}</td>` +
+                `<td>${timeText}</td>` +
+                `<td>${(t.description || '').replace(/<\/?[^>]+(>|$)/g, '')}</td>` +
+                '</tr>';
+        });
+
+        tableHtml += '</tbody></table>';
+
+        const htmlFile =
+            `<html><head><meta charset="UTF-8"></head><body>${tableHtml}</body></html>`;
+
+        const blob = new Blob([htmlFile], {
+            type: 'application/vnd.ms-excel'
+        });
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tarefas_${getTodayStr()}.xls`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // Tabela de "Todas as tarefas" (página Tarefas)
     function renderTasksTable() {
         const container = document.getElementById('tasksTable');
         if (!container) return;
-        const visible = sortTasks(getVisibleTasks());
+
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            container.innerHTML = '<p class="small-text">Apenas Gestores podem visualizar todas as tarefas.</p>';
+            return;
+        }
+
+        const visible = getFilteredTasksList();
 
         if (!visible.length) {
-            container.innerHTML = '<p class="small-text">Nenhuma tarefa cadastrada.</p>';
+            container.innerHTML = '<p class="small-text">Nenhuma tarefa cadastrada nesse período.</p>';
             return;
         }
 
         let html = '<table><thead><tr>' +
             '<th>Título</th><th>Data</th><th>Responsável</th><th>Empresa</th>' +
-            '<th>Status</th><th>Prioridade</th><th>Ações</th></tr></thead><tbody>';
+            '<th>Status</th><th>Prioridade</th><th>Tempo Em andamento</th><th>Ações</th></tr></thead><tbody>';
 
         visible.forEach(t => {
             const canDelete = currentUser.role === 'Gestor';
+            const statusClass = 'tag-' + (t.status || '').replace(/\s+/g, '-');
+            const priorityClass = 'tag-' + (t.priority || '');
 
             html += `<tr>
                 <td>${t.title}</td>
                 <td>${formatDateBR(t.date)}</td>
                 <td>${t.responsible}</td>
                 <td>${getCompanyNameById(t.companyId)}</td>
-                <td>
-                    <select onchange="updateTaskStatus('${t.id}', this.value)">
-                        <option value="Aberto" ${t.status === 'Aberto' ? 'selected' : ''}>Aberto</option>
-                        <option value="Em andamento" ${t.status === 'Em andamento' ? 'selected' : ''}>Em andamento</option>
-                        <option value="Concluído" ${t.status === 'Concluído' ? 'selected' : ''}>Concluído</option>
-                        <option value="Pendente" ${t.status === 'Pendente' ? 'selected' : ''}>Pendente</option>
-                    </select>
-                </td>
-                <td>
-                    <select onchange="updateTaskPriority('${t.id}', this.value)">
-                        <option value="Alta" ${t.priority === 'Alta' ? 'selected' : ''}>Alta</option>
-                        <option value="Média" ${t.priority === 'Média' ? 'selected' : ''}>Média</option>
-                        <option value="Baixa" ${t.priority === 'Baixa' ? 'selected' : ''}>Baixa</option>
-                    </select>
-                </td>
+                <td><span class="tag ${statusClass}">${t.status}</span></td>
+                <td><span class="tag ${priorityClass}">${t.priority}</span></td>
+                <td>${formatTimeSpent(t.timeSpentMs || 0)}</td>
                 <td class="actions">
                     ${canDelete ? `<button onclick="deleteTask('${t.id}')">Excluir</button>` : ''}
                 </td>
@@ -1249,11 +1456,14 @@
     function updateTaskStatus(id, newStatus) {
         const t = tasks.find(t => t.id === id);
         if (!t) return;
-        t.status = newStatus;
+
+        applyStatusChange(t, newStatus);
         db.collection('tasks').doc(t.id).set(t);
+
         renderTasksOverview();
         renderCalendar();
         if (selectedDate) renderDayTasks(selectedDate);
+        renderTasksTable();
     }
 
     function updateTaskPriority(id, newPriority) {
@@ -1264,6 +1474,7 @@
         renderTasksOverview();
         renderCalendar();
         if (selectedDate) renderDayTasks(selectedDate);
+        renderTasksTable();
     }
 
     function deleteTask(id) {
@@ -1272,6 +1483,12 @@
             return;
         }
         if (!confirm('Deseja realmente excluir esta tarefa?')) return;
+
+        const t = tasks.find(t => t.id === id);
+        if (t) {
+            applyStatusChange(t, 'Pendente');
+        }
+
         tasks = tasks.filter(t => t.id !== id);
         db.collection('tasks').doc(id).delete();
         renderTasksTable();
@@ -1295,7 +1512,7 @@
             '<th>Empresa</th><th>Status</th><th>Prioridade</th></tr></thead><tbody>';
 
         visible.forEach(t => {
-            const statusClass = 'tag-' + t.status.replace(' ', '\\ ');
+            const statusClass = 'tag-' + t.status.replace(/\s+/g, '-');
             const priorityClass = 'tag-' + t.priority;
             html += `<tr>
                 <td>${formatDateBR(t.date)}</td>
@@ -1418,7 +1635,6 @@
         renderDayTasks(dateStr);
     }
 
-    // Tarefas do dia (clicáveis para editar)
     function renderDayTasks(dateStr) {
         const container = document.getElementById('dayTasksList');
         const title = document.getElementById('dayTasksTitle');
@@ -1436,7 +1652,7 @@
         let html = '<table><thead><tr><th>Título</th><th>Resp.</th><th>Empresa</th><th>Status</th><th>Prioridade</th></tr></thead><tbody>';
 
         visible.forEach(t => {
-            const statusClass = 'tag-' + t.status.replace(' ', '\\ ');
+            const statusClass = 'tag-' + t.status.replace(/\s+/g, '-');
             const priorityClass = 'tag-' + t.priority;
             html += `<tr class="clickable-row" onclick="selectTaskForEdit('${t.id}')">
                 <td>${t.title}</td>
@@ -1474,12 +1690,14 @@
         } else {
             delBtn.style.display = 'none';
         }
+
+        const cancelBtn = document.getElementById('taskCancelBtn');
+        if (cancelBtn) cancelBtn.style.display = 'inline-block';
     }
 
     // ============================ INICIALIZAÇÃO ==============================
 
     document.addEventListener('DOMContentLoaded', async function () {
-        // Carrega dados do Firestore (multiusuário)
         await loadData();
         ensureDefaultAdmin();
 
