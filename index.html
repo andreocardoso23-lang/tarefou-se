@@ -14,6 +14,7 @@
             font-family: Arial, Helvetica, sans-serif;
         }
 
+        /* Fundo padrão da aplicação (área depois do login) */
         body {
             margin: 0;
             padding: 0;
@@ -30,25 +31,30 @@
             color: inherit;
         }
 
-        /* LOGIN */
+        /* LOGIN – fundo em tela cheia com a capivara
+           >>> Troque "capivara-login.png" pelo nome/caminho da sua imagem. */
         #loginView {
             min-height: 100vh;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
+            padding: 40px 60px;
+            background: #f4f5f7 url("capivara-login.png") center center / cover no-repeat fixed;
         }
 
         .login-card {
-            background: #fff;
-            padding: 25px 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            width: 320px;
+            background: #ffffff;
+            padding: 32px 36px;
+            border-radius: 18px;
+            box-shadow: 0 18px 45px rgba(0,0,0,0.08);
+            width: 360px;
         }
 
         .login-card h1 {
-            text-align: center;
-            margin-bottom: 20px;
+            font-size: 32px;
+            font-weight: 800;
+            text-align: left;
+            margin-bottom: 24px;
         }
 
         label {
@@ -63,11 +69,22 @@
         select,
         textarea {
             width: 100%;
-            padding: 6px 8px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            border: 1px solid #d0d7de;
             font-size: 14px;
+            outline: none;
+            background-color: #ffffff;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        input[type="date"]:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26,115,232,0.15);
         }
 
         textarea {
@@ -76,17 +93,18 @@
         }
 
         button {
-            padding: 8px 14px;
+            padding: 10px 14px;
             border: none;
-            border-radius: 4px;
-            background: #007bff;
+            border-radius: 8px;
+            background: #1a73e8;
             color: #fff;
             cursor: pointer;
             font-size: 14px;
+            font-weight: 600;
         }
 
         button:hover {
-            background: #0056b3;
+            background: #185abc;
         }
 
         .btn-secondary {
@@ -312,6 +330,14 @@
             main {
                 padding: 10px;
             }
+            #loginView {
+                justify-content: center;
+                padding: 20px;
+            }
+            .login-card {
+                width: 100%;
+                max-width: 380px;
+            }
         }
     </style>
 </head>
@@ -327,7 +353,7 @@
             <input type="text" id="loginUser" required>
             <label for="loginPass">Senha</label>
             <input type="password" id="loginPass" required>
-            <button type="submit" style="width:100%; margin-top:5px;">Entrar</button>
+            <button type="submit" style="width:100%; margin-top:8px;">Entrar</button>
         </form>
     </div>
 </div>
@@ -389,7 +415,7 @@
 
                             <div class="flex-row">
                                 <div class="flex-1">
-                                    <label for="taskUser">Responsável (usuário)</label>
+                                    <label for="taskUser">Responsável</label>
                                     <select id="taskUser" required></select>
                                 </div>
                                 <div class="flex-1">
@@ -473,9 +499,9 @@
         <!-- TAREFAS (apenas Gestor) -->
         <section id="tasksSection" class="section">
             <div class="card">
-                <h2>Todas as tarefas (apenas Gestor)</h2>
+                <h2>Todas as tarefas</h2>
 
-                <!-- Filtro de período + botões -->
+                <!-- Filtros -->
                 <div class="flex-row" style="margin-bottom:10px; flex-wrap:wrap; align-items:flex-end;">
                     <div class="flex-1">
                         <label for="filterStartDate">Data inicial</label>
@@ -484,6 +510,18 @@
                     <div class="flex-1">
                         <label for="filterEndDate">Data final</label>
                         <input type="date" id="filterEndDate">
+                    </div>
+                    <div class="flex-1">
+                        <label for="filterResponsible">Responsável</label>
+                        <select id="filterResponsible">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label for="filterCompany">Empresa</label>
+                        <select id="filterCompany">
+                            <option value="">Todas</option>
+                        </select>
                     </div>
                     <div style="display:flex; gap:8px; margin-bottom:10px;">
                         <button type="button" onclick="applyTaskDateFilter()">Filtrar</button>
@@ -536,7 +574,6 @@
 
 <script>
     // ========================== FIREBASE CONFIG ==========================
-
     const firebaseConfig = {
         apiKey: "AIzaSyAtUE0oNAyM4_ZGqqAPdCyEKTsCh9Zxz2o",
         authDomain: "tarefou-se.firebaseapp.com",
@@ -551,8 +588,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // ========================== DADOS & UTILITÁRIOS ==========================
-
+    // ========================== DADOS ==========================
     let users = [];
     let companies = [];
     let tasks = [];
@@ -566,38 +602,45 @@
     let editingCompanyId = null;
     let editingTaskId = null;
 
-    // Filtro de período na página Tarefas
-    let taskFilterStart = null; // 'YYYY-MM-DD' ou null
+    let taskFilterStart = null;
     let taskFilterEnd = null;
+    let taskFilterResponsible = null;
+    let taskFilterCompanyId = null;
+
+    let dayTasksSortField = null;
+    let dayTasksSortDirection = 'asc';
+
+    // ========================== FUNÇÕES AUXILIARES ==========================
+    async function loadData() {
+        try {
+            const usersSnapshot = await db.collection('users').get();
+            users = [];
+            usersSnapshot.forEach(doc => users.push(doc.data()));
+
+            const companiesSnapshot = await db.collection('companies').get();
+            companies = [];
+            companiesSnapshot.forEach(doc => companies.push(doc.data()));
+
+            const tasksSnapshot = await db.collection('tasks').get();
+            tasks = [];
+            tasksSnapshot.forEach(doc => tasks.push(doc.data()));
+        } catch (e) {
+            console.error("Erro ao carregar dados do Firestore (rodando offline?):", e);
+        }
+    }
 
     function saveUsers() {
-        users.forEach(u => {
-            db.collection('users').doc(u.id).set(u);
-        });
+        users.forEach(u => db.collection('users').doc(u.id).set(u));
     }
     function saveCompanies() {
-        companies.forEach(c => {
-            db.collection('companies').doc(c.id).set(c);
-        });
+        companies.forEach(c => db.collection('companies').doc(c.id).set(c));
     }
     function saveTasks() {
-        tasks.forEach(t => {
-            db.collection('tasks').doc(t.id).set(t);
-        });
+        tasks.forEach(t => db.collection('tasks').doc(t.id).set(t));
     }
 
-    async function loadData() {
-        const usersSnapshot = await db.collection('users').get();
-        users = [];
-        usersSnapshot.forEach(doc => users.push(doc.data()));
-
-        const companiesSnapshot = await db.collection('companies').get();
-        companies = [];
-        companiesSnapshot.forEach(doc => companies.push(doc.data()));
-
-        const tasksSnapshot = await db.collection('tasks').get();
-        tasks = [];
-        tasksSnapshot.forEach(doc => tasks.push(doc.data()));
+    function generateId() {
+        return Date.now().toString(36) + Math.random().toString(16).slice(2);
     }
 
     function parseLocalDate(dateStr) {
@@ -617,22 +660,6 @@
         return `${y}-${m}-${day}`;
     }
 
-    function ensureDefaultAdmin() {
-        if (!users.some(u => u.username === 'admin')) {
-            users.push({
-                id: generateId(),
-                username: 'admin',
-                password: '123',
-                role: 'Gestor'
-            });
-            saveUsers();
-        }
-    }
-
-    function generateId() {
-        return Date.now().toString(36) + Math.random().toString(16).slice(2);
-    }
-
     function formatDateBR(dateStr) {
         if (!dateStr) return '';
         const [y, m, d] = dateStr.split('-');
@@ -640,8 +667,7 @@
     }
 
     function getTodayStr() {
-        const d = new Date();
-        return dateToISO(d);
+        return dateToISO(new Date());
     }
 
     function formatTimeSpent(ms) {
@@ -649,21 +675,28 @@
         const totalSeconds = Math.floor(ms / 1000);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
-        if (hours > 0) {
-            return `${hours}h ${minutes}min`;
-        }
+        if (hours > 0) return `${hours}h ${minutes}min`;
         return `${minutes}min`;
+    }
+
+    function ensureDefaultAdmin() {
+        if (!users.some(u => u.username === 'admin')) {
+            const adminUser = {
+                id: generateId(),
+                username: 'admin',
+                password: '123',
+                role: 'Gestor'
+            };
+            users.push(adminUser);
+            saveUsers();
+        }
     }
 
     function applyStatusChange(task, newStatus) {
         const now = Date.now();
 
-        if (typeof task.timeSpentMs !== 'number') {
-            task.timeSpentMs = 0;
-        }
-        if (typeof task.currentStart !== 'number') {
-            task.currentStart = null;
-        }
+        if (typeof task.timeSpentMs !== 'number') task.timeSpentMs = 0;
+        if (typeof task.currentStart !== 'number') task.currentStart = null;
 
         const oldStatus = task.status || 'Aberto';
         if (oldStatus === newStatus) return;
@@ -689,20 +722,14 @@
             if (task.status !== 'Concluído' && task.date && task.date < todayStr) {
                 let d = parseLocalDate(task.date);
                 if (!d) return;
-                while (d < todayDate) {
-                    d.setDate(d.getDate() + 1);
-                }
-                const newDateStr = dateToISO(d);
-                task.date = newDateStr;
-
+                while (d < todayDate) d.setDate(d.getDate() + 1);
+                task.date = dateToISO(d);
                 applyStatusChange(task, 'Pendente');
                 changed = true;
             }
         });
 
-        if (changed) {
-            saveTasks();
-        }
+        if (changed) saveTasks();
     }
 
     function getVisibleTasks() {
@@ -721,46 +748,7 @@
         });
     }
 
-    // ============================== FORM DE TAREFA ============================
-
-    function resetTaskForm() {
-        const form = document.getElementById('taskForm');
-        if (form) form.reset();
-
-        const taskDateInput = document.getElementById('taskDate');
-        if (taskDateInput) taskDateInput.value = getTodayStr();
-
-        const recurrenceSelect = document.getElementById('taskRecurrence');
-        if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
-
-        const userSelect = document.getElementById('taskUser');
-        if (userSelect && userSelect.options.length > 0) {
-            userSelect.selectedIndex = 0;
-        }
-
-        const companySelect = document.getElementById('taskCompany');
-        if (companySelect && companySelect.options.length > 0) {
-            companySelect.selectedIndex = 0;
-        }
-
-        editingTaskId = null;
-
-        const submitBtn = document.getElementById('taskSubmitBtn');
-        if (submitBtn) submitBtn.textContent = 'Salvar tarefa';
-
-        const delBtn = document.getElementById('taskDeleteBtn');
-        if (delBtn) delBtn.style.display = 'none';
-
-        const cancelBtn = document.getElementById('taskCancelBtn');
-        if (cancelBtn) cancelBtn.style.display = 'none';
-    }
-
-    function cancelTaskEdit() {
-        resetTaskForm();
-    }
-
-    // ============================== LOGIN / SESSÃO ============================
-
+    // ========================== LOGIN / SESSÃO ==========================
     function showLogin() {
         document.getElementById('loginView').style.display = 'flex';
         document.getElementById('appView').style.display = 'none';
@@ -769,6 +757,7 @@
     function showApp() {
         document.getElementById('loginView').style.display = 'none';
         document.getElementById('appView').style.display = 'block';
+
         document.getElementById('currentUserInfo').innerText =
             currentUser.username + ' (' + currentUser.role + ')';
 
@@ -787,9 +776,9 @@
         event.preventDefault();
         const user = document.getElementById('loginUser').value.trim();
         const pass = document.getElementById('loginPass').value;
+        const errorDiv = document.getElementById('loginError');
 
         const found = users.find(u => u.username === user && u.password === pass);
-        const errorDiv = document.getElementById('loginError');
 
         if (!found) {
             errorDiv.style.display = 'block';
@@ -814,19 +803,15 @@
         showLogin();
     }
 
-    // ============================== NAVEGAÇÃO ================================
-
+    // ========================== NAVEGAÇÃO ==========================
     function showSection(sectionId) {
         if (sectionId === 'tasksSection' && (!currentUser || currentUser.role !== 'Gestor')) {
             alert('Apenas Gestores podem visualizar a página de tarefas.');
             sectionId = 'dashboardSection';
         }
 
-        const sections = document.querySelectorAll('.section');
-        sections.forEach(sec => sec.classList.remove('active'));
-
-        const navLinks = document.querySelectorAll('nav a');
-        navLinks.forEach(link => link.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+        document.querySelectorAll('nav a').forEach(link => link.classList.remove('active'));
 
         document.getElementById(sectionId).classList.add('active');
 
@@ -846,19 +831,45 @@
     function refreshAllUI() {
         renderUserSelect();
         renderCompanySelect();
+        renderTaskFilterOptions();
         renderTasksTable();
         renderTasksOverview();
         renderCompaniesTable();
         renderUsersTable();
         renderCalendar();
         renderInProgressTasks();
-        if (selectedDate) {
-            renderDayTasks(selectedDate);
-        }
+        if (selectedDate) renderDayTasks(selectedDate);
     }
 
-    // ============================ USUÁRIOS ===================================
+    // ========================== FORM TAREFA ==========================
+    function resetTaskForm() {
+        const form = document.getElementById('taskForm');
+        if (form) form.reset();
 
+        const taskDateInput = document.getElementById('taskDate');
+        if (taskDateInput) taskDateInput.value = getTodayStr();
+
+        const recurrenceSelect = document.getElementById('taskRecurrence');
+        if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
+
+        const userSelect = document.getElementById('taskUser');
+        if (userSelect && userSelect.options.length > 0) userSelect.selectedIndex = 0;
+
+        const companySelect = document.getElementById('taskCompany');
+        if (companySelect && companySelect.options.length > 0) companySelect.selectedIndex = 0;
+
+        editingTaskId = null;
+
+        document.getElementById('taskSubmitBtn').textContent = 'Salvar tarefa';
+        document.getElementById('taskDeleteBtn').style.display = 'none';
+        document.getElementById('taskCancelBtn').style.display = 'none';
+    }
+
+    function cancelTaskEdit() {
+        resetTaskForm();
+    }
+
+    // ========================== USUÁRIOS ==========================
     function renderUsersTable() {
         const container = document.getElementById('usersTable');
         if (!container) return;
@@ -972,6 +983,7 @@
             document.getElementById('userForm').reset();
             renderUsersTable();
             renderUserSelect();
+            renderTaskFilterOptions();
             return;
         }
 
@@ -1002,6 +1014,7 @@
         document.getElementById('userForm').reset();
         renderUsersTable();
         renderUserSelect();
+        renderTaskFilterOptions();
     }
 
     function editUser(id) {
@@ -1042,10 +1055,10 @@
         db.collection('users').doc(id).delete();
         renderUsersTable();
         renderUserSelect();
+        renderTaskFilterOptions();
     }
 
-    // ============================ EMPRESAS ===================================
-
+    // ========================== EMPRESAS ==========================
     function handleCompanyForm(event) {
         event.preventDefault();
         const nameInput = document.getElementById('companyName');
@@ -1081,6 +1094,7 @@
         document.getElementById('companyForm').reset();
         renderCompaniesTable();
         renderCompanySelect();
+        renderTaskFilterOptions();
     }
 
     function renderCompaniesTable() {
@@ -1174,10 +1188,10 @@
         db.collection('companies').doc(id).delete();
         renderCompaniesTable();
         renderCompanySelect();
+        renderTaskFilterOptions();
     }
 
-    // ============================ TAREFAS ====================================
-
+    // ========================== TAREFAS ==========================
     function createTaskClone(baseTask, dateStr) {
         const clone = {
             id: generateId(),
@@ -1216,18 +1230,14 @@
             while (true) {
                 d.setDate(d.getDate() + 1);
                 if (d.getFullYear() !== year) break;
-                if (isWeekday(d)) {
-                    createTaskClone(baseTask, dateToISO(d));
-                }
+                if (isWeekday(d)) createTaskClone(baseTask, dateToISO(d));
             }
         } else if (recurrence === 'Semanal') {
             let d = new Date(startDate);
             while (true) {
                 d.setDate(d.getDate() + 7);
                 if (d.getFullYear() !== year) break;
-                if (isWeekday(d)) {
-                    createTaskClone(baseTask, dateToISO(d));
-                }
+                if (isWeekday(d)) createTaskClone(baseTask, dateToISO(d));
             }
         } else if (recurrence === 'Mensal') {
             const originalDay = startDate.getDate();
@@ -1240,9 +1250,7 @@
                     if (month > 11) break;
                     continue;
                 }
-                if (isWeekday(d)) {
-                    createTaskClone(baseTask, dateToISO(d));
-                }
+                if (isWeekday(d)) createTaskClone(baseTask, dateToISO(d));
                 month++;
                 if (month > 11) break;
             }
@@ -1252,7 +1260,7 @@
     function handleTaskForm(event) {
         event.preventDefault();
         const title = document.getElementById('taskTitle').value.trim();
-        let date = document.getElementById('taskDate').value;
+        const date = document.getElementById('taskDate').value;
         const responsible = document.getElementById('taskUser').value;
         const companyId = document.getElementById('taskCompany').value;
         const status = document.getElementById('taskStatus').value;
@@ -1271,7 +1279,6 @@
                 alert('Tarefa não encontrada para edição.');
             } else {
                 applyStatusChange(task, status);
-
                 task.title = title;
                 task.date = date;
                 task.responsible = responsible;
@@ -1279,7 +1286,6 @@
                 task.priority = priority;
                 task.description = description;
                 task.recurrence = recurrence;
-
                 db.collection('tasks').doc(task.id).set(task);
             }
         } else {
@@ -1297,14 +1303,10 @@
                 timeSpentMs: 0,
                 currentStart: null
             };
-
-            if (status === 'Em andamento') {
-                baseTask.currentStart = now;
-            }
+            if (status === 'Em andamento') baseTask.currentStart = now;
 
             tasks.push(baseTask);
             db.collection('tasks').doc(baseTask.id).set(baseTask);
-
             generateRecurrenceTasks(baseTask);
         }
 
@@ -1313,9 +1315,7 @@
         renderTasksOverview();
         renderCalendar();
         renderInProgressTasks();
-        if (selectedDate) {
-            renderDayTasks(selectedDate);
-        }
+        if (selectedDate) renderDayTasks(selectedDate);
     }
 
     function deleteCurrentEditingTask() {
@@ -1324,18 +1324,19 @@
         resetTaskForm();
     }
 
-    // Aplica filtro de período na lista de tarefas (para página Tarefas / export)
     function getFilteredTasksList() {
         let visible = sortTasks(getVisibleTasks());
 
-        if (taskFilterStart || taskFilterEnd) {
-            visible = visible.filter(t => {
+        visible = visible.filter(t => {
+            if (taskFilterStart || taskFilterEnd) {
                 if (!t.date) return false;
                 if (taskFilterStart && t.date < taskFilterStart) return false;
                 if (taskFilterEnd && t.date > taskFilterEnd) return false;
-                return true;
-            });
-        }
+            }
+            if (taskFilterResponsible && t.responsible !== taskFilterResponsible) return false;
+            if (taskFilterCompanyId && t.companyId !== taskFilterCompanyId) return false;
+            return true;
+        });
 
         return visible;
     }
@@ -1343,22 +1344,31 @@
     function applyTaskDateFilter() {
         const startInput = document.getElementById('filterStartDate');
         const endInput = document.getElementById('filterEndDate');
+        const respSelect = document.getElementById('filterResponsible');
+        const companySelect = document.getElementById('filterCompany');
+
         taskFilterStart = startInput.value || null;
         taskFilterEnd = endInput.value || null;
+        taskFilterResponsible = respSelect ? (respSelect.value || null) : null;
+        taskFilterCompanyId = companySelect ? (companySelect.value || null) : null;
+
         renderTasksTable();
     }
 
     function clearTaskDateFilter() {
         taskFilterStart = null;
         taskFilterEnd = null;
-        const startInput = document.getElementById('filterStartDate');
-        const endInput = document.getElementById('filterEndDate');
-        if (startInput) startInput.value = '';
-        if (endInput) endInput.value = '';
+        taskFilterResponsible = null;
+        taskFilterCompanyId = null;
+
+        document.getElementById('filterStartDate').value = '';
+        document.getElementById('filterEndDate').value = '';
+        document.getElementById('filterResponsible').value = '';
+        document.getElementById('filterCompany').value = '';
+
         renderTasksTable();
     }
 
-    // Exportar tarefas para "Excel" (arquivo .xls com tabela HTML)
     function exportTasksToExcel() {
         if (!currentUser || currentUser.role !== 'Gestor') {
             alert('Apenas Gestores podem exportar as tarefas.');
@@ -1402,12 +1412,8 @@
 
         tableHtml += '</tbody></table>';
 
-        const htmlFile =
-            `<html><head><meta charset="UTF-8"></head><body>${tableHtml}</body></html>`;
-
-        const blob = new Blob([htmlFile], {
-            type: 'application/vnd.ms-excel'
-        });
+        const htmlFile = `<html><head><meta charset="UTF-8"></head><body>${tableHtml}</body></html>`;
+        const blob = new Blob([htmlFile], { type: 'application/vnd.ms-excel' });
 
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1419,7 +1425,6 @@
         URL.revokeObjectURL(url);
     }
 
-    // Tabela de "Todas as tarefas" (página Tarefas)
     function renderTasksTable() {
         const container = document.getElementById('tasksTable');
         if (!container) return;
@@ -1463,6 +1468,49 @@
         container.innerHTML = html;
     }
 
+    function renderTaskFilterOptions() {
+        const respSelect = document.getElementById('filterResponsible');
+        const companySelect = document.getElementById('filterCompany');
+
+        if (respSelect) {
+            const current = taskFilterResponsible || '';
+            respSelect.innerHTML = '';
+
+            const optAll = document.createElement('option');
+            optAll.value = '';
+            optAll.textContent = 'Todos';
+            respSelect.appendChild(optAll);
+
+            users.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.username;
+                opt.textContent = u.username;
+                respSelect.appendChild(opt);
+            });
+
+            respSelect.value = current;
+        }
+
+        if (companySelect) {
+            const currentComp = taskFilterCompanyId || '';
+            companySelect.innerHTML = '';
+
+            const optAllC = document.createElement('option');
+            optAllC.value = '';
+            optAllC.textContent = 'Todas';
+            companySelect.appendChild(optAllC);
+
+            companies.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                companySelect.appendChild(opt);
+            });
+
+            companySelect.value = currentComp;
+        }
+    }
+
     function updateTaskStatus(id, newStatus) {
         const t = tasks.find(t => t.id === id);
         if (!t) return;
@@ -1497,9 +1545,7 @@
         if (!confirm('Deseja realmente excluir esta tarefa?')) return;
 
         const t = tasks.find(t => t.id === id);
-        if (t) {
-            applyStatusChange(t, 'Pendente');
-        }
+        if (t) applyStatusChange(t, 'Pendente');
 
         tasks = tasks.filter(t => t.id !== id);
         db.collection('tasks').doc(id).delete();
@@ -1541,8 +1587,6 @@
         container.innerHTML = html;
     }
 
-    // ============================ LISTA EM ANDAMENTO =========================
-    // Colunas: Título, Data, Responsável, Empresa, Status, Prioridade
     function renderInProgressTasks() {
         const container = document.getElementById('inProgressList');
         if (!container) return;
@@ -1578,8 +1622,7 @@
         container.innerHTML = html;
     }
 
-    // ============================ CALENDÁRIO ================================
-
+    // ========================== CALENDÁRIO ==========================
     function renderCalendar() {
         const calendarDiv = document.getElementById('calendar');
         const monthLabel = document.getElementById('monthLabel');
@@ -1619,9 +1662,7 @@
             '<th>Qui</th><th>Sex</th><th>Sáb</th></tr></thead><tbody><tr>';
 
         let day = 1;
-        for (let i = 0; i < startingDay; i++) {
-            html += '<td></td>';
-        }
+        for (let i = 0; i < startingDay; i++) html += '<td></td>';
 
         for (let i = startingDay; i < 7; i++) {
             html += buildCalendarDayCell(day, monthLength, tasksByDay, todayStr);
@@ -1656,9 +1697,7 @@
 
         let html = `<td class="${classes.join(' ')}" onclick="selectDate('${dateStr}')">`;
         html += day;
-        if (hasTasks) {
-            html += '<div class="dot"></div>';
-        }
+        if (hasTasks) html += '<div class="dot"></div>';
         html += '</td>';
         return html;
     }
@@ -1686,21 +1725,88 @@
         renderDayTasks(dateStr);
     }
 
+    function setDayTasksSort(field) {
+        if (dayTasksSortField === field) {
+            dayTasksSortDirection = (dayTasksSortDirection === 'asc') ? 'desc' : 'asc';
+        } else {
+            dayTasksSortField = field;
+            dayTasksSortDirection = 'asc';
+        }
+        if (selectedDate) renderDayTasks(selectedDate);
+    }
+
     function renderDayTasks(dateStr) {
         const container = document.getElementById('dayTasksList');
         const title = document.getElementById('dayTasksTitle');
         title.innerText = 'Tarefas em ' + formatDateBR(dateStr);
 
-        const visible = sortTasks(
-            getVisibleTasks().filter(t => t.date === dateStr)
-        );
+        let visible = getVisibleTasks().filter(t => t.date === dateStr);
 
         if (!visible.length) {
             container.innerHTML = '<p class="small-text">Nenhuma tarefa para este dia.</p>';
             return;
         }
 
-        let html = '<table><thead><tr><th>Título</th><th>Resp.</th><th>Empresa</th><th>Status</th><th>Prioridade</th></tr></thead><tbody>';
+        const priorityOrder = { 'Alta': 1, 'Média': 2, 'Baixa': 3 };
+
+        if (dayTasksSortField) {
+            visible.sort((a, b) => {
+                let valA, valB;
+
+                switch (dayTasksSortField) {
+                    case 'title':
+                        valA = (a.title || '').toUpperCase();
+                        valB = (b.title || '').toUpperCase();
+                        break;
+                    case 'responsible':
+                        valA = (a.responsible || '').toUpperCase();
+                        valB = (b.responsible || '').toUpperCase();
+                        break;
+                    case 'company':
+                        valA = (getCompanyNameById(a.companyId) || '').toUpperCase();
+                        valB = (getCompanyNameById(b.companyId) || '').toUpperCase();
+                        break;
+                    case 'status':
+                        valA = (a.status || '').toUpperCase();
+                        valB = (b.status || '').toUpperCase();
+                        break;
+                    case 'priority':
+                        valA = priorityOrder[a.priority] || 999;
+                        valB = priorityOrder[b.priority] || 999;
+                        break;
+                    default:
+                        valA = 0;
+                        valB = 0;
+                }
+
+                let compare = 0;
+                if (dayTasksSortField === 'priority') {
+                    compare = valA - valB;
+                } else {
+                    if (valA < valB) compare = -1;
+                    else if (valA > valB) compare = 1;
+                    else compare = 0;
+                }
+
+                return (dayTasksSortDirection === 'asc') ? compare : -compare;
+            });
+        } else {
+            visible = sortTasks(visible);
+        }
+
+        const titleArrow    = (dayTasksSortField === 'title')       ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+        const respArrow     = (dayTasksSortField === 'responsible') ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+        const companyArrow  = (dayTasksSortField === 'company')     ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+        const statusArrow   = (dayTasksSortField === 'status')      ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+        const priorityArrow = (dayTasksSortField === 'priority')    ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+
+        let html = '<table><thead><tr>' +
+            '<th onclick="setDayTasksSort(\'title\')">Título' + titleArrow + '</th>' +
+            '<th onclick="setDayTasksSort(\'responsible\')">Resp.' + respArrow + '</th>' +
+            '<th onclick="setDayTasksSort(\'company\')">Empresa' + companyArrow + '</th>' +
+            '<th onclick="setDayTasksSort(\'status\')">Status' + statusArrow + '</th>' +
+            '<th onclick="setDayTasksSort(\'priority\')">Prioridade' + priorityArrow + '</th>' +
+            '</tr></thead><tbody>';
 
         visible.forEach(t => {
             const statusClass = 'tag-' + t.status.replace(/\s+/g, '-');
@@ -1735,19 +1841,13 @@
 
         document.getElementById('taskSubmitBtn').textContent = 'Atualizar tarefa';
 
-        const delBtn = document.getElementById('taskDeleteBtn');
-        if (currentUser && currentUser.role === 'Gestor') {
-            delBtn.style.display = 'inline-block';
-        } else {
-            delBtn.style.display = 'none';
-        }
+        document.getElementById('taskDeleteBtn').style.display =
+            (currentUser && currentUser.role === 'Gestor') ? 'inline-block' : 'none';
 
-        const cancelBtn = document.getElementById('taskCancelBtn');
-        if (cancelBtn) cancelBtn.style.display = 'inline-block';
+        document.getElementById('taskCancelBtn').style.display = 'inline-block';
     }
 
-    // ============================ INICIALIZAÇÃO ==============================
-
+    // ========================== INICIALIZAÇÃO ==========================
     document.addEventListener('DOMContentLoaded', async function () {
         await loadData();
         ensureDefaultAdmin();
@@ -1768,9 +1868,7 @@
 
         const taskDateInput = document.getElementById('taskDate');
         function fillTodayIfEmpty() {
-            if (!taskDateInput.value) {
-                taskDateInput.value = getTodayStr();
-            }
+            if (!taskDateInput.value) taskDateInput.value = getTodayStr();
         }
         taskDateInput.addEventListener('focus', fillTodayIfEmpty);
         taskDateInput.addEventListener('click', fillTodayIfEmpty);
