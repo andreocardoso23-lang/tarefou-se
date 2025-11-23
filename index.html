@@ -360,6 +360,11 @@
             background: #f1f3f5;
         }
 
+        /* Hover para Tarefas do Dia */
+        #dayTasksList table tbody tr:hover {
+            background: #f1f3f5;
+        }
+
         /* Toast de "Copiado!" */
         .copy-toast {
             position: fixed;
@@ -613,8 +618,17 @@
                     </div>
 
                     <div class="card">
-                        <h2 id="dayTasksTitle">Tarefas do dia</h2>
-                        <div id="dayTasksList" class="small-text">
+                        <div class="flex-row" style="align-items:center; justify-content:space-between; gap:8px;">
+                            <h2 id="dayTasksTitle" style="margin-bottom:0;">Tarefas do dia</h2>
+                            <!-- Filtro de responsáveis (somente Gestor) -->
+                            <div id="dayTasksFilterContainer" class="small-text" style="display:none;">
+                                <label for="dayTasksResponsibleFilter" style="margin-right:4px;">Responsável:</label>
+                                <select id="dayTasksResponsibleFilter" onchange="setDayTasksResponsibleFilter(this.value)">
+                                    <option value="">Todos</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="dayTasksList" class="small-text" style="margin-top:8px;">
                             Selecione um dia no calendário para ver as tarefas.
                         </div>
                     </div>
@@ -638,7 +652,8 @@
                         </div>
                     </div>
 
-                    <div class="flex-row" style="align-items:center;">
+                    <!-- LINHA AJUSTADA: Regime + Checkbox + Botões alinhados -->
+                    <div class="flex-row" style="align-items:flex-end;">
                         <div class="flex-1">
                             <label for="companyRegime">Regime Tributário</label>
                             <select id="companyRegime">
@@ -650,14 +665,19 @@
                                 <option value="Outro">Outro</option>
                             </select>
                         </div>
-                        <div style="width:200px; display:flex; align-items:flex-end; gap:8px;">
-                            <div style="display:flex; align-items:center;">
+                        <div class="flex-1" style="display:flex; align-items:flex-end; justify-content:flex-end; gap:12px;">
+                            <div style="display:flex; align-items:center; margin-right:auto;">
                                 <input type="checkbox" id="companyActiveBPO">
                                 <label for="companyActiveBPO" style="margin:0;">Cliente ativo BPO</label>
                             </div>
-                            <div style="display:flex; align-items:flex-end;">
-                                <button type="submit" id="companySubmitBtn">Adicionar empresa</button>
-                            </div>
+                            <button type="submit" id="companySubmitBtn">Adicionar empresa</button>
+                            <button type="button"
+                                    id="companyCancelBtn"
+                                    class="btn-secondary"
+                                    style="display:none;"
+                                    onclick="cancelCompanyEdit()">
+                                Voltar
+                            </button>
                         </div>
                     </div>
 
@@ -805,7 +825,7 @@
                 <h2>Cadastro de usuários</h2>
                 <p class="small-text">
                     Somente Gestores devem cadastrar usuários.<br>
-                    O usuário padrão <b>admin</b> (Gestor) já existe com senha <b>123</b>.
+                    
                 </p>
                 <form id="userForm">
                     <div class="flex-row">
@@ -844,8 +864,8 @@
         <div id="recurrenceModalMessage" class="small-text" style="margin-bottom:8px;"></div>
 
         <div class="options">
-            <label><input type="radio" name="recurrenceChoice" value="this" checked> Apenas esta(s) tarefa(s) selecionada(s)</label>
-            <label><input type="radio" name="recurrenceChoice" value="all"> Todas as tarefas da(s) série(s)</label>
+            <label><input type="radio" name="recurrenceChoice" value="this" checked> Apenas esta tarefa selecionada</label>
+            <label><input type="radio" name="recurrenceChoice" value="all"> Todas as tarefas das séries</label>
         </div>
 
         <div class="buttons">
@@ -897,6 +917,7 @@
 
     let dayTasksSortField = null;
     let dayTasksSortDirection = 'asc';
+    let dayTasksFilterResponsible = ''; // filtro de responsável nas tarefas do dia (apenas Gestor)
 
     // Selection set for multi-delete in tasks page
     const selectedTaskIds = new Set();
@@ -1189,7 +1210,8 @@
         renderCalendar();
         renderInProgressTasks();
         renderPasswordCompanySelect();
-        renderPasswordsTable();
+        renderPasswordsTable(); // <<< garantir que a página de Senhas sempre atualize
+        renderDayTasksResponsibleFilter();
         if (selectedDate) renderDayTasks(selectedDate);
     }
 
@@ -1336,6 +1358,7 @@
             renderUsersTable();
             renderUserSelect();
             renderTaskFilterOptions();
+            renderDayTasksResponsibleFilter();
             return;
         }
 
@@ -1367,6 +1390,7 @@
         renderUsersTable();
         renderUserSelect();
         renderTaskFilterOptions();
+        renderDayTasksResponsibleFilter();
     }
 
     function editUser(id) {
@@ -1408,6 +1432,7 @@
         renderUsersTable();
         renderUserSelect();
         renderTaskFilterOptions();
+        renderDayTasksResponsibleFilter();
     }
 
     // ========================== EMPRESAS ==========================
@@ -1419,6 +1444,7 @@
         const activeCheckbox = document.getElementById('companyActiveBPO');
         const bpoStartInput = document.getElementById('companyBPOStart');
         const submitBtn = document.getElementById('companySubmitBtn');
+        const cancelBtn = document.getElementById('companyCancelBtn');
         const name = nameInput.value.trim();
         const cnpj = cnpjInput ? cnpjInput.value.trim() : '';
         const regime = regimeSelect ? regimeSelect.value : '';
@@ -1431,8 +1457,9 @@
         }
 
         if (editingCompanyId) {
-            if (!currentUser || currentUser.username !== 'admin') {
-                alert('Somente o usuário admin pode alterar empresas.');
+            // >>> ALTERADO: agora qualquer Gestor pode alterar empresas <<<
+            if (!currentUser || currentUser.role !== 'Gestor') {
+                alert('Somente Gestores podem alterar empresas.');
                 return;
             }
             const c = companies.find(c => c.id === editingCompanyId);
@@ -1446,6 +1473,7 @@
             }
             editingCompanyId = null;
             submitBtn.textContent = 'Adicionar empresa';
+            if (cancelBtn) cancelBtn.style.display = 'none';
         } else {
             const newCompany = {
                 id: generateId(),
@@ -1476,6 +1504,28 @@
         renderPasswordCompanySelect();
     }
 
+    // NOVA FUNÇÃO: cancelar edição de empresa (botão Voltar)
+    function cancelCompanyEdit() {
+        editingCompanyId = null;
+        const form = document.getElementById('companyForm');
+        if (form) form.reset();
+
+        const regimeSelect = document.getElementById('companyRegime');
+        if (regimeSelect) regimeSelect.value = '';
+
+        const activeCheckbox = document.getElementById('companyActiveBPO');
+        if (activeCheckbox) activeCheckbox.checked = false;
+
+        const bpoStartInput = document.getElementById('companyBPOStart');
+        if (bpoStartInput) bpoStartInput.value = '';
+
+        const submitBtn = document.getElementById('companySubmitBtn');
+        if (submitBtn) submitBtn.textContent = 'Adicionar empresa';
+
+        const cancelBtn = document.getElementById('companyCancelBtn');
+        if (cancelBtn) cancelBtn.style.display = 'none';
+    }
+
     function renderCompaniesTable() {
         const container = document.getElementById('companiesTable');
         if (!container) return;
@@ -1493,10 +1543,11 @@
         const activeCount = companies.filter(c => !!c.activeBPO).length;
         document.getElementById('companiesActiveCount').innerText = String(activeCount);
 
-        const isAdmin = currentUser && currentUser.username === 'admin';
+        // >>> ALTERADO: permissão baseada no perfil Gestor, não só username admin <<<
+        const canManageCompanies = currentUser && currentUser.role === 'Gestor';
 
         let html = '<table><thead><tr><th>Nome</th><th>CNPJ</th><th>Regime</th><th>Cliente ativo</th><th>Início BPO</th>';
-        if (isAdmin) html += '<th>Ações</th>';
+        if (canManageCompanies) html += '<th>Ações</th>';
         html += '</tr></thead><tbody>';
 
         companies.forEach(c => {
@@ -1505,7 +1556,7 @@
             const activeDisplay = c.activeBPO ? '<strong style="color:#155724;">Sim</strong>' : 'Não';
             const bpoStartDisplay = c.bpoStart ? formatDateBR(c.bpoStart) : '-';
             html += `<tr><td>${c.name}</td><td>${cnpjDisplay}</td><td>${regimeDisplay}</td><td>${activeDisplay}</td><td>${bpoStartDisplay}</td>`;
-            if (isAdmin) {
+            if (canManageCompanies) {
                 html += `<td class="actions">
                     <button onclick="editCompany('${c.id}')">Editar</button>
                     <button onclick="deleteCompany('${c.id}')">Excluir</button>
@@ -1554,8 +1605,9 @@
     }
 
     function editCompany(id) {
-        if (!currentUser || currentUser.username !== 'admin') {
-            alert('Somente o usuário admin pode editar empresas.');
+        // >>> ALTERADO: agora qualquer Gestor pode editar empresas <<<
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Somente Gestores podem editar empresas.');
             return;
         }
         const c = companies.find(c => c.id === id);
@@ -1568,6 +1620,7 @@
         const activeCheckbox = document.getElementById('companyActiveBPO');
         const bpoStartInput = document.getElementById('companyBPOStart');
         const submitBtn = document.getElementById('companySubmitBtn');
+        const cancelBtn = document.getElementById('companyCancelBtn');
 
         nameInput.value = c.name || '';
         cnpjInput.value = c.cnpj || '';
@@ -1575,6 +1628,8 @@
         activeCheckbox.checked = !!c.activeBPO;
         bpoStartInput.value = c.bpoStart || '';
         submitBtn.textContent = 'Atualizar empresa';
+
+        if (cancelBtn) cancelBtn.style.display = 'inline-block';
 
         // --- NOVA PARTE: subir a página automaticamente para o formulário e focar o campo nome ---
         const formEl = document.getElementById('companyForm');
@@ -1592,8 +1647,9 @@
     }
 
     function deleteCompany(id) {
-        if (!currentUser || currentUser.username !== 'admin') {
-            alert('Somente o usuário admin pode excluir empresas.');
+        // >>> ALTERADO: agora qualquer Gestor pode excluir empresas <<<
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Somente Gestores podem excluir empresas.');
             return;
         }
         if (!confirm('Deseja realmente excluir esta empresa?')) return;
@@ -2573,6 +2629,45 @@
     }
 
     // ==========================
+    // FILTRO DE RESPONSÁVEIS NAS TAREFAS DO DIA (apenas Gestor)
+    // ==========================
+    function renderDayTasksResponsibleFilter() {
+        const container = document.getElementById('dayTasksFilterContainer');
+        const select = document.getElementById('dayTasksResponsibleFilter');
+        if (!container || !select) return;
+
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            container.style.display = 'none';
+            dayTasksFilterResponsible = '';
+            return;
+        }
+
+        container.style.display = 'block';
+
+        const current = dayTasksFilterResponsible || '';
+        select.innerHTML = '';
+
+        const optAll = document.createElement('option');
+        optAll.value = '';
+        optAll.textContent = 'Todos';
+        select.appendChild(optAll);
+
+        users.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.username;
+            opt.textContent = u.username;
+            select.appendChild(opt);
+        });
+
+        select.value = current;
+    }
+
+    function setDayTasksResponsibleFilter(value) {
+        dayTasksFilterResponsible = value || '';
+        if (selectedDate) renderDayTasks(selectedDate);
+    }
+
+    // ==========================
     // RENDER DAY TASKS MODIFIED
     // ==========================
     function renderDayTasks(dateStr) {
@@ -2580,7 +2675,11 @@
         const title = document.getElementById('dayTasksTitle');
         title.innerText = 'Tarefas em ' + formatDateBR(dateStr);
 
-        let visible = getVisibleTasks().filter(t => t.date === dateStr);
+        let visible = getVisibleTasks().filter(t => {
+            if (t.date !== dateStr) return false;
+            if (dayTasksFilterResponsible && t.responsible !== dayTasksFilterResponsible) return false;
+            return true;
+        });
 
         if (!visible.length) {
             container.innerHTML = '<p class="small-text">Nenhuma tarefa para este dia.</p>';
@@ -2652,7 +2751,7 @@
             const prClass = 'tag-' + (t.priority || '');
             const statusClass = STATUS_META[t.status]?.cls || 'tag-Aberto';
 
-            html += `<tr>
+            html += `<tr class="clickable-row" onclick="selectTaskForEdit('${t.id}')">
                 <td>${t.title}</td>
                 <td>${t.responsible}</td>
                 <td>${getCompanyNameById(t.companyId)}</td>
@@ -3030,9 +3129,9 @@
         renderCompaniesTable();
         renderUsersTable();
         renderTaskFilterOptions();
+        renderDayTasksResponsibleFilter();
     });
 </script>
 
 </body>
 </html>
-
