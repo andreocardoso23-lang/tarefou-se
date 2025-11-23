@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-UTF-8">
+    <meta charset="UTF-8">
     <title>Tarefou-se!</title>
 
     <!-- Firebase (versão compat para uso simples em HTML) -->
@@ -76,6 +76,11 @@
             font-size: 14px;
             outline: none;
             background-color: #ffffff;
+        }
+
+        input[type="checkbox"] {
+            transform: scale(1.05);
+            margin-right: 8px;
         }
 
         input[type="text"]:focus,
@@ -191,6 +196,18 @@
         .card h2 {
             margin-bottom: 10px;
             font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .count-badge {
+            background: #e9ecef;
+            border-radius: 12px;
+            padding: 4px 8px;
+            font-size: 13px;
+            color: #333;
+            font-weight: 700;
         }
 
         .card h3 {
@@ -215,10 +232,13 @@
 
         .tag {
             display: inline-block;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
             color: #fff;
+            cursor: pointer;
+            user-select: none;
+            font-weight: 600;
         }
 
         .tag-Alta { background: #dc3545; }
@@ -228,7 +248,7 @@
         .tag-Aberto { background: #17a2b8; }
         .tag-Em-andamento { background: #6f42c1; }
         .tag-Concluído { background: #28a745; }
-        .tag-Pendente { background: #fd7e14; }
+        .tag-Pendente { background: #fd7e14; color: #000; }
 
         .actions button {
             font-size: 11px;
@@ -361,6 +381,49 @@
             opacity: 1;
         }
 
+        /* Modal de escolha de recorrência */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .modal {
+            background: #fff;
+            width: 420px;
+            max-width: 90%;
+            padding: 18px;
+            border-radius: 10px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+        }
+
+        .modal h3 {
+            margin-bottom: 8px;
+        }
+
+        .modal .options {
+            margin: 12px 0;
+        }
+
+        .modal .options label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+
+        .modal .buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
         @media (max-width: 900px) {
             .grid {
                 grid-template-columns: 1fr;
@@ -377,6 +440,47 @@
                 max-width: 380px;
             }
         }
+
+        /* dropdown menu style */
+        .status-dropdown {
+            position: fixed;
+            min-width: 160px;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+            background: #fff;
+            z-index: 20000;
+            padding: 6px;
+            overflow: hidden;
+
+            /* COR FIXA (evita herdar color do header) */
+            color: #222 !important;
+        }
+
+        /* garantir que os botões do dropdown tenham texto escuro e boa legibilidade */
+        .status-dropdown button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 8px 10px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-weight: 600;
+            border-radius: 6px;
+            color: #222 !important; /* forçar cor legível */
+            outline: none;
+        }
+
+        .status-dropdown button:hover {
+            background: #f1f3f5;
+        }
+
+        .status-dropdown button span {
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
     </style>
 </head>
 <body>
@@ -523,14 +627,61 @@
             <div class="card">
                 <h2>Cadastro de empresas</h2>
                 <form id="companyForm">
-                    <label for="companyName">Nome da empresa</label>
-                    <input type="text" id="companyName" required>
-                    <button type="submit" id="companySubmitBtn">Adicionar empresa</button>
+                    <div class="flex-row">
+                        <div class="flex-1">
+                            <label for="companyName">Nome da empresa</label>
+                            <input type="text" id="companyName" required>
+                        </div>
+                        <div style="width:220px;">
+                            <label for="companyCNPJ">CNPJ</label>
+                            <input type="text" id="companyCNPJ" placeholder="00.000.000/0000-00">
+                        </div>
+                    </div>
+
+                    <div class="flex-row" style="align-items:center;">
+                        <div class="flex-1">
+                            <label for="companyRegime">Regime Tributário</label>
+                            <select id="companyRegime">
+                                <option value="">-- Selecionar --</option>
+                                <option value="Simples Nacional">Simples Nacional</option>
+                                <option value="Lucro Presumido">Lucro Presumido</option>
+                                <option value="Lucro Real">Lucro Real</option>
+                                <option value="MEI">MEI</option>
+                                <option value="Outro">Outro</option>
+                            </select>
+                        </div>
+                        <div style="width:200px; display:flex; align-items:flex-end; gap:8px;">
+                            <div style="display:flex; align-items:center;">
+                                <input type="checkbox" id="companyActiveBPO">
+                                <label for="companyActiveBPO" style="margin:0;">Cliente ativo BPO</label>
+                            </div>
+                            <div style="display:flex; align-items:flex-end;">
+                                <button type="submit" id="companySubmitBtn">Adicionar empresa</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NOVO: campo data de início do serviço BPO -->
+                    <div class="flex-row" style="align-items:center;">
+                        <div class="flex-1">
+                            <label for="companyBPOStart">Data de início do serviço BPO</label>
+                            <input type="date" id="companyBPOStart">
+                        </div>
+                        <div style="width:220px; align-self:flex-end;">
+                            <span class="small-text">Preencha apenas se já houver início do BPO.</span>
+                        </div>
+                    </div>
                 </form>
             </div>
 
             <div class="card">
-                <h2>Empresas cadastradas</h2>
+                <h2>
+                    Empresas cadastradas
+                    <span id="companiesCount" class="count-badge">0</span>
+                    <span id="companiesActiveCount" class="count-badge" style="margin-left:8px; background:#28a745; color:#fff;">
+                        0
+                    </span>
+                </h2>
                 <div id="companiesTable"></div>
             </div>
         </section>
@@ -567,6 +718,13 @@
                         <button type="button" class="btn-secondary" onclick="clearTaskDateFilter()">Limpar</button>
                         <button type="button" onclick="exportTasksToExcel()">Baixar Excel</button>
                     </div>
+                </div>
+
+                <!-- Botão para excluir selecionadas -->
+                <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+                    <button id="deleteSelectedBtn" type="button" class="btn-secondary" onclick="deleteSelectedTasks()" style="display:none;">
+                        Excluir selecionadas
+                    </button>
                 </div>
 
                 <div id="tasksTable"></div>
@@ -679,6 +837,24 @@
     </main>
 </div>
 
+<!-- Modal de escolha (aplicar apenas esta ocorrência ou todas) -->
+<div id="recurrenceModal" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal" role="document">
+        <h3 id="recurrenceModalTitle">Escolha</h3>
+        <div id="recurrenceModalMessage" class="small-text" style="margin-bottom:8px;"></div>
+
+        <div class="options">
+            <label><input type="radio" name="recurrenceChoice" value="this" checked> Apenas esta(s) tarefa(s) selecionada(s)</label>
+            <label><input type="radio" name="recurrenceChoice" value="all"> Todas as tarefas da(s) série(s)</label>
+        </div>
+
+        <div class="buttons">
+            <button id="recurrenceCancelBtn" class="btn-secondary">Cancelar</button>
+            <button id="recurrenceConfirmBtn">Confirmar</button>
+        </div>
+    </div>
+</div>
+
 <!-- Toast de cópia -->
 <div id="copyToast" class="copy-toast">Copiado!</div>
 
@@ -722,6 +898,16 @@
     let dayTasksSortField = null;
     let dayTasksSortDirection = 'asc';
 
+    // Selection set for multi-delete in tasks page
+    const selectedTaskIds = new Set();
+
+    // Keep a reference to the open dropdown so we can close it
+    let __openStatusDropdown = null;
+    // Track anchor element for toggle behavior
+    let __openStatusDropdownAnchor = null;
+    let __outsideClickHandler = null;
+    let __escapeHandler = null;
+
     // ========================== FUNÇÕES AUXILIARES ==========================
     async function loadData() {
         try {
@@ -731,7 +917,13 @@
 
             const companiesSnapshot = await db.collection('companies').get();
             companies = [];
-            companiesSnapshot.forEach(doc => companies.push(doc.data()));
+            companiesSnapshot.forEach(doc => {
+                const c = doc.data();
+                // garantir compatibilidade se o campo não existir
+                c.activeBPO = !!c.activeBPO;
+                c.bpoStart = c.bpoStart || ''; // novo campo: data de início do BPO (YYYY-MM-DD)
+                companies.push(c);
+            });
 
             const tasksSnapshot = await db.collection('tasks').get();
             tasks = [];
@@ -741,21 +933,30 @@
             passwords = [];
             passwordsSnapshot.forEach(doc => passwords.push(doc.data()));
         } catch (e) {
-            console.error("Erro ao carregar dados do Firestore (rodando offline?):", e);
+            console.error("Erro ao carregar dados do Firestore (rodando offline ou sem permissão?):", e);
+            // fallback: manter arrays vazios — ensureDefaultAdmin cuidará do admin local
         }
     }
 
     function saveUsers() {
-        users.forEach(u => db.collection('users').doc(u.id).set(u));
+        users.forEach(u => {
+            try { db.collection('users').doc(u.id).set(u); } catch (e) { /* ignore */ }
+        });
     }
     function saveCompanies() {
-        companies.forEach(c => db.collection('companies').doc(c.id).set(c));
+        companies.forEach(c => {
+            try { db.collection('companies').doc(c.id).set(c); } catch (e) { /* ignore */ }
+        });
     }
     function saveTasks() {
-        tasks.forEach(t => db.collection('tasks').doc(t.id).set(t));
+        tasks.forEach(t => {
+            try { db.collection('tasks').doc(t.id).set(t); } catch (e) { /* ignore */ }
+        });
     }
     function savePasswords() {
-        passwords.forEach(p => db.collection('passwords').doc(p.id).set(p));
+        passwords.forEach(p => {
+            try { db.collection('passwords').doc(p.id).set(p); } catch (e) { /* ignore */ }
+        });
     }
 
     function generateId() {
@@ -799,6 +1000,7 @@
     }
 
     function ensureDefaultAdmin() {
+        // garante admin local se não existir — útil se Firestore não carregou
         if (!users.some(u => u.username === 'admin')) {
             const adminUser = {
                 id: generateId(),
@@ -807,7 +1009,7 @@
                 role: 'Gestor'
             };
             users.push(adminUser);
-            saveUsers();
+            try { db.collection('users').doc(adminUser.id).set(adminUser); } catch (e) { /* ignore write error */ }
         }
     }
 
@@ -861,7 +1063,7 @@
         const priorityOrder = { 'Alta': 1, 'Média': 2, 'Baixa': 3 };
         return list.sort((a, b) => {
             if (a.date === b.date) {
-                return priorityOrder[a.priority] - priorityOrder[b.priority];
+                return (priorityOrder[a.priority] || 99) - (priorityOrder[b.priority] || 99);
             }
             return (a.date || '').localeCompare(b.date || '');
         });
@@ -895,6 +1097,10 @@
             passwordForm.style.display = currentUser.role === 'Gestor' ? 'block' : 'none';
         }
 
+        // botão excluir selecionadas só para gestor
+        const delSel = document.getElementById('deleteSelectedBtn');
+        if (delSel) delSel.style.display = currentUser.role === 'Gestor' ? 'inline-block' : 'none';
+
         selectedDate = getTodayStr();
         resetTaskForm();
         resetPasswordForm();
@@ -903,15 +1109,21 @@
 
     async function handleLogin(event) {
         event.preventDefault();
-        const user = document.getElementById('loginUser').value.trim();
+        const userInput = document.getElementById('loginUser').value.trim();
         const pass = document.getElementById('loginPass').value;
         const errorDiv = document.getElementById('loginError');
 
-        const found = users.find(u => u.username === user && u.password === pass);
+        // Se a lista users ainda não foi carregada (ou está vazia), garantir admin local
+        if (!users || users.length === 0) {
+            ensureDefaultAdmin();
+        }
+
+        const found = users.find(u => u.username === userInput && u.password === pass);
 
         if (!found) {
+            // feedback mais claro
             errorDiv.style.display = 'block';
-            errorDiv.innerText = 'Usuário ou senha inválidos.';
+            errorDiv.innerText = 'Usuário ou senha inválidos. Verifique e tente novamente (usuário padrão: admin / 123).';
             return;
         }
 
@@ -1127,7 +1339,7 @@
             return;
         }
 
-        if (currentUser.role !== 'Gestor') {
+        if (!currentUser || currentUser.role !== 'Gestor') {
             alert('Somente Gestores podem cadastrar usuários.');
             return;
         }
@@ -1149,7 +1361,7 @@
             role: role
         };
         users.push(newUser);
-        db.collection('users').doc(newUser.id).set(newUser);
+        try { db.collection('users').doc(newUser.id).set(newUser); } catch (e) { /* ignore */ }
 
         document.getElementById('userForm').reset();
         renderUsersTable();
@@ -1192,7 +1404,7 @@
         if (!confirm('Deseja realmente excluir este usuário?')) return;
 
         users = users.filter(us => us.id !== id);
-        db.collection('users').doc(id).delete();
+        try { db.collection('users').doc(id).delete(); } catch (e) { /* ignore */ }
         renderUsersTable();
         renderUserSelect();
         renderTaskFilterOptions();
@@ -1202,8 +1414,16 @@
     function handleCompanyForm(event) {
         event.preventDefault();
         const nameInput = document.getElementById('companyName');
+        const cnpjInput = document.getElementById('companyCNPJ');
+        const regimeSelect = document.getElementById('companyRegime');
+        const activeCheckbox = document.getElementById('companyActiveBPO');
+        const bpoStartInput = document.getElementById('companyBPOStart');
         const submitBtn = document.getElementById('companySubmitBtn');
         const name = nameInput.value.trim();
+        const cnpj = cnpjInput ? cnpjInput.value.trim() : '';
+        const regime = regimeSelect ? regimeSelect.value : '';
+        const active = !!(activeCheckbox && activeCheckbox.checked);
+        const bpoStart = (bpoStartInput && bpoStartInput.value) ? bpoStartInput.value : '';
 
         if (!name) {
             alert('Digite o nome da empresa.');
@@ -1218,20 +1438,38 @@
             const c = companies.find(c => c.id === editingCompanyId);
             if (c) {
                 c.name = name;
-                db.collection('companies').doc(c.id).set(c);
+                c.cnpj = cnpj || '';
+                c.regime = regime || '';
+                c.activeBPO = active;
+                c.bpoStart = bpoStart || '';
+                try { db.collection('companies').doc(c.id).set(c); } catch (e) { /* ignore */ }
             }
             editingCompanyId = null;
             submitBtn.textContent = 'Adicionar empresa';
         } else {
             const newCompany = {
                 id: generateId(),
-                name: name
+                name: name,
+                cnpj: cnpj || '',
+                regime: regime || '',
+                activeBPO: active,
+                bpoStart: bpoStart || ''
             };
             companies.push(newCompany);
-            db.collection('companies').doc(newCompany.id).set(newCompany);
+            try { db.collection('companies').doc(newCompany.id).set(newCompany); } catch (e) { /* ignore */ }
         }
 
         document.getElementById('companyForm').reset();
+        // reset regime select placeholder
+        const reg = document.getElementById('companyRegime');
+        if (reg) reg.value = '';
+        // ensure checkbox reset
+        const chk = document.getElementById('companyActiveBPO');
+        if (chk) chk.checked = false;
+        // reset BPO start date
+        const bpo = document.getElementById('companyBPOStart');
+        if (bpo) bpo.value = '';
+
         renderCompaniesTable();
         renderCompanySelect();
         renderTaskFilterOptions();
@@ -1243,18 +1481,30 @@
         if (!container) return;
 
         if (!companies.length) {
+            document.getElementById('companiesCount').innerText = '0';
+            document.getElementById('companiesActiveCount').innerText = '0';
             container.innerHTML = '<p class="small-text">Nenhuma empresa cadastrada.</p>';
             return;
         }
 
+        document.getElementById('companiesCount').innerText = String(companies.length);
+
+        // contar ativos como cliente BPO (tratar undefined como false)
+        const activeCount = companies.filter(c => !!c.activeBPO).length;
+        document.getElementById('companiesActiveCount').innerText = String(activeCount);
+
         const isAdmin = currentUser && currentUser.username === 'admin';
 
-        let html = '<table><thead><tr><th>Nome</th>';
+        let html = '<table><thead><tr><th>Nome</th><th>CNPJ</th><th>Regime</th><th>Cliente ativo</th><th>Início BPO</th>';
         if (isAdmin) html += '<th>Ações</th>';
         html += '</tr></thead><tbody>';
 
         companies.forEach(c => {
-            html += `<tr><td>${c.name}</td>`;
+            const cnpjDisplay = c.cnpj && c.cnpj.trim() ? c.cnpj : '-';
+            const regimeDisplay = c.regime && c.regime.trim() ? c.regime : '-';
+            const activeDisplay = c.activeBPO ? '<strong style="color:#155724;">Sim</strong>' : 'Não';
+            const bpoStartDisplay = c.bpoStart ? formatDateBR(c.bpoStart) : '-';
+            html += `<tr><td>${c.name}</td><td>${cnpjDisplay}</td><td>${regimeDisplay}</td><td>${activeDisplay}</td><td>${bpoStartDisplay}</td>`;
             if (isAdmin) {
                 html += `<td class="actions">
                     <button onclick="editCompany('${c.id}')">Editar</button>
@@ -1313,10 +1563,32 @@
 
         editingCompanyId = id;
         const nameInput = document.getElementById('companyName');
+        const cnpjInput = document.getElementById('companyCNPJ');
+        const regimeSelect = document.getElementById('companyRegime');
+        const activeCheckbox = document.getElementById('companyActiveBPO');
+        const bpoStartInput = document.getElementById('companyBPOStart');
         const submitBtn = document.getElementById('companySubmitBtn');
 
-        nameInput.value = c.name;
+        nameInput.value = c.name || '';
+        cnpjInput.value = c.cnpj || '';
+        regimeSelect.value = c.regime || '';
+        activeCheckbox.checked = !!c.activeBPO;
+        bpoStartInput.value = c.bpoStart || '';
         submitBtn.textContent = 'Atualizar empresa';
+
+        // --- NOVA PARTE: subir a página automaticamente para o formulário e focar o campo nome ---
+        const formEl = document.getElementById('companyForm');
+        if (formEl && formEl.scrollIntoView) {
+            // usa smooth scroll para melhor UX
+            formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+            // fallback: scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        // dar foco ao campo nome após pequeno delay (garante que o scroll/paint aconteceu)
+        setTimeout(() => {
+            try { nameInput.focus(); nameInput.select(); } catch (e) { /* ignore */ }
+        }, 450);
     }
 
     function deleteCompany(id) {
@@ -1326,7 +1598,7 @@
         }
         if (!confirm('Deseja realmente excluir esta empresa?')) return;
         companies = companies.filter(c => c.id !== id);
-        db.collection('companies').doc(id).delete();
+        try { db.collection('companies').doc(id).delete(); } catch (e) { /* ignore */ }
         renderCompaniesTable();
         renderCompanySelect();
         renderTaskFilterOptions();
@@ -1334,6 +1606,19 @@
     }
 
     // ========================== TAREFAS ==========================
+    // Helper: retorna os membros da série (todos os recorrentes relacionados ao mesmo 'baseId' ou, se não houver baseId, por comparação heurística)
+    function getSeriesTasks(task) {
+        if (!task) return [];
+        if (task.baseId) {
+            return tasks.filter(t => t.baseId === task.baseId);
+        }
+        // Fallback heurística: mesma title, responsible, companyId e mesma recorrência
+        return tasks.filter(t => t.recurrence === task.recurrence &&
+            t.title === task.title &&
+            t.responsible === task.responsible &&
+            t.companyId === task.companyId);
+    }
+
     function createTaskClone(baseTask, dateStr) {
         const clone = {
             id: generateId(),
@@ -1346,16 +1631,20 @@
             description: baseTask.description,
             recurrence: baseTask.recurrence,
             timeSpentMs: 0,
-            currentStart: null
+            currentStart: null,
+            baseId: baseTask.baseId || baseTask.id
         };
         tasks.push(clone);
-        db.collection('tasks').doc(clone.id).set(clone);
+        try { db.collection('tasks').doc(clone.id).set(clone); } catch (e) { /* ignore */ }
     }
 
     function generateRecurrenceTasks(baseTask) {
         const recurrence = baseTask.recurrence || 'Nenhuma';
         if (recurrence === 'Nenhuma') return;
         if (!baseTask.date) return;
+
+        // Guarantee baseId exists on base task
+        if (!baseTask.baseId) baseTask.baseId = baseTask.id;
 
         const startDate = parseLocalDate(baseTask.date);
         if (!startDate) return;
@@ -1399,7 +1688,56 @@
         }
     }
 
-    function handleTaskForm(event) {
+    // ==========================
+    // Modal helper: mostra modal com opções "Apenas esta tarefa" / "Todas as tarefas"
+    // Retorna uma Promise que resolve 'this' | 'all' | null (null = cancel)
+    // ==========================
+    function showRecurrenceModal(message, title = 'Escolha') {
+        return new Promise((resolve) => {
+            const overlay = document.getElementById('recurrenceModal');
+            const msgEl = document.getElementById('recurrenceModalMessage');
+            const titleEl = document.getElementById('recurrenceModalTitle');
+            const confirmBtn = document.getElementById('recurrenceConfirmBtn');
+            const cancelBtn = document.getElementById('recurrenceCancelBtn');
+
+            titleEl.innerText = title;
+            msgEl.innerText = message;
+
+            // ensure default selection
+            const radios = overlay.querySelectorAll('input[name="recurrenceChoice"]');
+            radios.forEach(r => r.checked = (r.value === 'this'));
+
+            function cleanup() {
+                confirmBtn.removeEventListener('click', onConfirm);
+                cancelBtn.removeEventListener('click', onCancel);
+                overlay.style.display = 'none';
+                overlay.setAttribute('aria-hidden', 'true');
+            }
+
+            function onConfirm() {
+                const chosen = overlay.querySelector('input[name="recurrenceChoice"]:checked');
+                const value = chosen ? chosen.value : 'this';
+                cleanup();
+                resolve(value === 'all' ? 'all' : 'this');
+            }
+
+            function onCancel() {
+                cleanup();
+                resolve(null);
+            }
+
+            confirmBtn.addEventListener('click', onConfirm);
+            cancelBtn.addEventListener('click', onCancel);
+
+            overlay.style.display = 'flex';
+            overlay.setAttribute('aria-hidden', 'false');
+        });
+    }
+
+    // ==========================
+    // handleTaskForm agora é async para usar o modal quando necessário
+    // ==========================
+    async function handleTaskForm(event) {
         event.preventDefault();
         const title = document.getElementById('taskTitle').value.trim();
         const date = document.getElementById('taskDate').value;
@@ -1420,15 +1758,53 @@
             if (!task) {
                 alert('Tarefa não encontrada para edição.');
             } else {
-                applyStatusChange(task, status);
-                task.title = title;
-                task.date = date;
-                task.responsible = responsible;
-                task.companyId = companyId;
-                task.priority = priority;
-                task.description = description;
-                task.recurrence = recurrence;
-                db.collection('tasks').doc(task.id).set(task);
+                // If task is part of a recurrence series, ask the user via modal
+                if (task.recurrence && task.recurrence !== 'Nenhuma') {
+                    const choice = await showRecurrenceModal(
+                        'Esta tarefa faz parte de uma recorrência.\n\nEscolha "Apenas esta ocorrência" para aplicar somente a alteração nesta tarefa ou "Todas as tarefas" para aplicar a TODAS as tarefas.',
+                        'Alterar tarefa recorrente'
+                    );
+
+                    if (choice === null) {
+                        // user canceled
+                        return;
+                    }
+
+                    if (choice === 'all') {
+                        const series = getSeriesTasks(task);
+                        series.forEach(t => {
+                            applyStatusChange(t, status);
+                            t.title = title;
+                            t.responsible = responsible;
+                            t.companyId = companyId;
+                            t.priority = priority;
+                            t.description = description;
+                            t.recurrence = recurrence;
+                            // Do NOT overwrite date for other occurrences
+                            try { db.collection('tasks').doc(t.id).set(t); } catch (e) { /* ignore */ }
+                        });
+                    } else {
+                        applyStatusChange(task, status);
+                        task.title = title;
+                        task.date = date;
+                        task.responsible = responsible;
+                        task.companyId = companyId;
+                        task.priority = priority;
+                        task.description = description;
+                        task.recurrence = recurrence;
+                        try { db.collection('tasks').doc(task.id).set(task); } catch (e) { /* ignore */ }
+                    }
+                } else {
+                    applyStatusChange(task, status);
+                    task.title = title;
+                    task.date = date;
+                    task.responsible = responsible;
+                    task.companyId = companyId;
+                    task.priority = priority;
+                    task.description = description;
+                    task.recurrence = recurrence;
+                    try { db.collection('tasks').doc(task.id).set(task); } catch (e) { /* ignore */ }
+                }
             }
         } else {
             const now = Date.now();
@@ -1443,12 +1819,15 @@
                 description,
                 recurrence,
                 timeSpentMs: 0,
-                currentStart: null
+                currentStart: null,
+                baseId: null
             };
             if (status === 'Em andamento') baseTask.currentStart = now;
+            // set baseId so series can be tracked
+            baseTask.baseId = baseTask.id;
 
             tasks.push(baseTask);
-            db.collection('tasks').doc(baseTask.id).set(baseTask);
+            try { db.collection('tasks').doc(baseTask.id).set(baseTask); } catch (e) { /* ignore */ }
             generateRecurrenceTasks(baseTask);
         }
 
@@ -1460,10 +1839,45 @@
         if (selectedDate) renderDayTasks(selectedDate);
     }
 
-    function deleteCurrentEditingTask() {
+    // ==========================
+    // deleteCurrentEditingTask usa modal quando a tarefa é recorrente
+    // ==========================
+    async function deleteCurrentEditingTask() {
         if (!editingTaskId) return;
-        deleteTask(editingTaskId);
+        const task = tasks.find(t => t.id === editingTaskId);
+        if (!task) return;
+
+        if (task.recurrence && task.recurrence !== 'Nenhuma') {
+            const choice = await showRecurrenceModal(
+                'Esta tarefa faz parte de uma recorrência.\n\nEscolha "Apenas esta tarefa" para aplicar somente a alteração nesta tarefa ou "Todas as tarefas" para aplicar a TODAS as tarefas.',
+                'Excluir tarefa recorrente'
+            );
+            if (choice === null) return;
+
+            if (choice === 'all') {
+                const series = getSeriesTasks(task);
+                if (!confirm(`Confirma excluir ${series.length} tarefas recorrentes?`)) return;
+                series.forEach(t => {
+                    tasks = tasks.filter(x => x.id !== t.id);
+                    try { db.collection('tasks').doc(t.id).delete(); } catch (e) { /* ignore */ }
+                });
+            } else {
+                if (!confirm('Deseja realmente excluir esta tarefa?')) return;
+                tasks = tasks.filter(t => t.id !== task.id);
+                try { db.collection('tasks').doc(task.id).delete(); } catch (e) { /* ignore */ }
+            }
+        } else {
+            if (!confirm('Deseja realmente excluir esta tarefa?')) return;
+            tasks = tasks.filter(t => t.id !== task.id);
+            try { db.collection('tasks').doc(task.id).delete(); } catch (e) { /* ignore */ }
+        }
+
         resetTaskForm();
+        renderTasksTable();
+        renderTasksOverview();
+        renderCalendar();
+        renderInProgressTasks();
+        if (selectedDate) renderDayTasks(selectedDate);
     }
 
     function getFilteredTasksList() {
@@ -1583,16 +1997,20 @@
             return;
         }
 
+        // Build table with checkbox column (A coluna "Ações" foi removida conforme solicitado)
         let html = '<table><thead><tr>' +
+            '<th style="width:36px;"><input id="selectAllCheckbox" type="checkbox" onchange="toggleSelectAll(this)"></th>' +
             '<th>Título</th><th>Data</th><th>Responsável</th><th>Empresa</th>' +
-            '<th>Status</th><th>Prioridade</th><th>Tempo Em andamento</th><th>Ações</th></tr></thead><tbody>';
+            '<th>Status</th><th>Prioridade</th><th>Tempo Em andamento</th></tr></thead><tbody>';
 
         visible.forEach(t => {
-            const canDelete = currentUser.role === 'Gestor';
             const statusClass = 'tag-' + (t.status || '').replace(/\s+/g, '-');
             const priorityClass = 'tag-' + (t.priority || '');
 
+            const checked = selectedTaskIds.has(t.id) ? 'checked' : '';
+
             html += `<tr>
+                <td><input type="checkbox" class="task-select-checkbox" data-taskid="${t.id}" ${checked} onchange="toggleTaskSelection(this)"></td>
                 <td>${t.title}</td>
                 <td>${formatDateBR(t.date)}</td>
                 <td>${t.responsible}</td>
@@ -1600,14 +2018,116 @@
                 <td><span class="tag ${statusClass}">${t.status}</span></td>
                 <td><span class="tag ${priorityClass}">${t.priority}</span></td>
                 <td>${formatTimeSpent(t.timeSpentMs || 0)}</td>
-                <td class="actions">
-                    ${canDelete ? `<button onclick="deleteTask('${t.id}')">Excluir</button>` : ''}
-                </td>
             </tr>`;
         });
 
         html += '</tbody></table>';
         container.innerHTML = html;
+
+        // show/hide delete selected button depending on selection
+        const delBtn = document.getElementById('deleteSelectedBtn');
+        if (delBtn) delBtn.style.display = (selectedTaskIds.size > 0 && currentUser.role === 'Gestor') ? 'inline-block' : (currentUser.role === 'Gestor' ? 'inline-block' : 'none');
+
+        // update selectAll checkbox state
+        const selectAll = document.getElementById('selectAllCheckbox');
+        if (selectAll) {
+            const allIds = visible.map(v => v.id);
+            const allSelected = allIds.length > 0 && allIds.every(id => selectedTaskIds.has(id));
+            selectAll.checked = allSelected;
+            // if some selected but not all -> set indeterminate
+            selectAll.indeterminate = selectedTaskIds.size > 0 && !allSelected;
+        }
+    }
+
+    function toggleSelectAll(el) {
+        const check = el.checked;
+        const visible = getFilteredTasksList();
+        visible.forEach(t => {
+            if (check) selectedTaskIds.add(t.id);
+            else selectedTaskIds.delete(t.id);
+        });
+        renderTasksTable();
+    }
+
+    function toggleTaskSelection(checkbox) {
+        const id = checkbox.getAttribute('data-taskid');
+        if (!id) return;
+        if (checkbox.checked) selectedTaskIds.add(id);
+        else selectedTaskIds.delete(id);
+        renderTasksTable();
+    }
+
+    async function deleteSelectedTasks() {
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Somente Gestores podem excluir tarefas.');
+            return;
+        }
+        if (!selectedTaskIds.size) {
+            alert('Nenhuma tarefa selecionada.');
+            return;
+        }
+
+        // Collect selected tasks
+        const selected = tasks.filter(t => selectedTaskIds.has(t.id));
+        if (!selected.length) {
+            alert('Nenhuma tarefa válida selecionada.');
+            return;
+        }
+
+        // Check if any selected tasks are recurring
+        const recurringSelected = selected.filter(t => t.recurrence && t.recurrence !== 'Nenhuma');
+
+        if (recurringSelected.length) {
+            const choice = await showRecurrenceModal(
+                `Existem ${recurringSelected.length} tarefa(s) recorrente(s) selecionada(s). Deseja excluir todas as ocorrências das séries ou apenas as ocorrências selecionadas?`,
+                'Excluir tarefas recorrentes'
+            );
+            if (choice === null) return;
+
+            if (choice === 'all') {
+                // Gather all ids to delete: for each recurringSelected, delete its whole series
+                const toDeleteIds = new Set();
+                recurringSelected.forEach(t => {
+                    const series = getSeriesTasks(t);
+                    series.forEach(s => toDeleteIds.add(s.id));
+                });
+                // Also include non-recurring selected tasks
+                selected.filter(t => ! (t.recurrence && t.recurrence !== 'Nenhuma')).forEach(t => toDeleteIds.add(t.id));
+
+                if (!confirm(`Confirma excluir ${toDeleteIds.size} tarefas (inclui todas as ocorrências das séries)?`)) return;
+
+                // Delete
+                toDeleteIds.forEach(id => {
+                    tasks = tasks.filter(x => x.id !== id);
+                    try { db.collection('tasks').doc(id).delete(); } catch (e) { /* ignore */ }
+                    selectedTaskIds.delete(id);
+                });
+
+            } else {
+                // choice === 'this' -> delete only selected occurrences (no series deletion)
+                if (!confirm(`Confirma excluir ${selected.length} tarefas selecionadas?`)) return;
+                selected.forEach(t => {
+                    tasks = tasks.filter(x => x.id !== t.id);
+                    try { db.collection('tasks').doc(t.id).delete(); } catch (e) { /* ignore */ }
+                    selectedTaskIds.delete(t.id);
+                });
+            }
+        } else {
+            // No recurring tasks — delete selected directly
+            if (!confirm(`Confirma excluir ${selected.length} tarefas selecionadas?`)) return;
+            selected.forEach(t => {
+                tasks = tasks.filter(x => x.id !== t.id);
+                try { db.collection('tasks').doc(t.id).delete(); } catch (e) { /* ignore */ }
+                selectedTaskIds.delete(t.id);
+            });
+        }
+
+        // refresh UI
+        renderTasksTable();
+        renderTasksOverview();
+        renderCalendar();
+        renderInProgressTasks();
+        if (selectedDate) renderDayTasks(selectedDate);
     }
 
     function renderTaskFilterOptions() {
@@ -1657,8 +2177,24 @@
         const t = tasks.find(t => t.id === id);
         if (!t) return;
 
+        // Permissão: Gestor pode alterar qualquer um; Operador só altera se for responsável
+        if (!currentUser) {
+            alert('Faça login para alterar o status.');
+            closeStatusDropdown();
+            renderDayTasks(selectedDate);
+            return;
+        }
+        if (currentUser.role !== 'Gestor' && currentUser.username !== t.responsible) {
+            alert('Você não tem permissão para alterar o status desta tarefa.');
+            closeStatusDropdown();
+            renderDayTasks(selectedDate);
+            return;
+        }
+
         applyStatusChange(t, newStatus);
-        db.collection('tasks').doc(t.id).set(t);
+        try { db.collection('tasks').doc(t.id).set(t); } catch (e) { /* ignore */ }
+
+        closeStatusDropdown();
 
         renderTasksOverview();
         renderCalendar();
@@ -1671,7 +2207,7 @@
         const t = tasks.find(t => t.id === id);
         if (!t) return;
         t.priority = newPriority;
-        db.collection('tasks').doc(t.id).set(t);
+        try { db.collection('tasks').doc(t.id).set(t); } catch (e) { /* ignore */ }
         renderTasksOverview();
         renderCalendar();
         renderInProgressTasks();
@@ -1679,18 +2215,48 @@
         renderTasksTable();
     }
 
-    function deleteTask(id) {
-        if (currentUser.role !== 'Gestor') {
+    // ==========================
+    // deleteTask (ao excluir da tabela) também usa modal para recorrência
+    // ==========================
+    async function deleteTask(id) {
+        if (!currentUser || currentUser.role !== 'Gestor') {
             alert('Somente Gestores podem excluir tarefas.');
             return;
         }
-        if (!confirm('Deseja realmente excluir esta tarefa?')) return;
-
         const t = tasks.find(t => t.id === id);
         if (t) applyStatusChange(t, 'Pendente');
 
-        tasks = tasks.filter(t => t.id !== id);
-        db.collection('tasks').doc(id).delete();
+        if (!t) return;
+
+        if (t.recurrence && t.recurrence !== 'Nenhuma') {
+            const choice = await showRecurrenceModal(
+                'Esta tarefa faz parte de uma recorrência.\n\nEscolha "Todas as tarefas" para excluir TODAS as ocorrências recorrentes ou "Apenas esta tarefa" para excluir apenas ESTA.',
+                'Excluir tarefa recorrente'
+            );
+
+            if (choice === null) return;
+
+            if (choice === 'all') {
+                const series = getSeriesTasks(t);
+                if (!confirm(`Confirma excluir ${series.length} tarefas recorrentes?`)) return;
+                series.forEach(item => {
+                    tasks = tasks.filter(x => x.id !== item.id);
+                    try { db.collection('tasks').doc(item.id).delete(); } catch (e) { /* ignore */ }
+                    selectedTaskIds.delete(item.id);
+                });
+            } else {
+                if (!confirm('Deseja realmente excluir esta tarefa?')) return;
+                tasks = tasks.filter(x => x.id !== t.id);
+                try { db.collection('tasks').doc(t.id).delete(); } catch (e) { /* ignore */ }
+                selectedTaskIds.delete(t.id);
+            }
+        } else {
+            if (!confirm('Deseja realmente excluir esta tarefa?')) return;
+            tasks = tasks.filter(x => x.id !== t.id);
+            try { db.collection('tasks').doc(t.id).delete(); } catch (e) { /* ignore */ }
+            selectedTaskIds.delete(t.id);
+        }
+
         renderTasksTable();
         renderTasksOverview();
         renderCalendar();
@@ -1750,7 +2316,7 @@
             const statusClass = 'tag-' + t.status.replace(/\s+/g, '-');
             const priorityClass = 'tag-' + t.priority;
 
-            html += `<tr class="clickable-row" onclick="selectTaskForEdit('${t.id}')">
+            html += `<tr>
                 <td>${t.title}</td>
                 <td>${formatDateBR(t.date)}</td>
                 <td>${t.responsible}</td>
@@ -1877,6 +2443,138 @@
         if (selectedDate) renderDayTasks(selectedDate);
     }
 
+    // ==========================
+    // Helper: mapeia status para classes / cores (mantém as cores originais)
+    // ==========================
+    const STATUS_META = {
+        'Aberto': { cls: 'tag-Aberto', bg: '#17a2b8', color: '#fff' },
+        'Em andamento': { cls: 'tag-Em-andamento', bg: '#6f42c1', color: '#fff' },
+        'Concluído': { cls: 'tag-Concluído', bg: '#28a745', color: '#fff' },
+        'Pendente': { cls: 'tag-Pendente', bg: '#fd7e14', color: '#000' }
+    };
+
+    // ==========================
+    // Dropdown menu: abre ao clicar na tag (apenas 1 clique) — agora com toggle ao clicar novamente
+    // ==========================
+    function closeStatusDropdown() {
+        if (__openStatusDropdown) {
+            __openStatusDropdown.remove();
+            __openStatusDropdown = null;
+        }
+        // reset anchor ref as well
+        __openStatusDropdownAnchor = null;
+
+        if (__outsideClickHandler) {
+            document.removeEventListener('click', __outsideClickHandler);
+            __outsideClickHandler = null;
+        }
+        if (__escapeHandler) {
+            document.removeEventListener('keydown', __escapeHandler);
+            __escapeHandler = null;
+        }
+    }
+
+    function openStatusDropdown(taskId, anchorEl) {
+        // If the same anchor was clicked and a dropdown is open, toggle/close it
+        if (__openStatusDropdown && __openStatusDropdownAnchor === anchorEl) {
+            closeStatusDropdown();
+            return;
+        }
+
+        // fecha qualquer dropdown aberto antes de abrir um novo (se for outro anchor)
+        closeStatusDropdown();
+
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        if (!currentUser) {
+            alert('Faça login para alterar o status.');
+            return;
+        }
+        if (currentUser.role !== 'Gestor' && currentUser.username !== task.responsible) {
+            alert('Você não tem permissão para alterar o status desta tarefa.');
+            return;
+        }
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'status-dropdown';
+
+        const statuses = ['Aberto', 'Em andamento', 'Concluído', 'Pendente'];
+
+        statuses.forEach(s => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.innerText = s;
+            // color the option to match status color (small square + bold text)
+            const meta = STATUS_META[s] || { bg: '#fff', color: '#000' };
+            btn.style.display = 'flex';
+            btn.style.alignItems = 'center';
+            btn.style.gap = '8px';
+
+            const colorBox = document.createElement('span');
+            colorBox.style.display = 'inline-block';
+            colorBox.style.width = '12px';
+            colorBox.style.height = '12px';
+            colorBox.style.borderRadius = '3px';
+            colorBox.style.background = meta.bg;
+            colorBox.style.border = '1px solid rgba(0,0,0,0.06)';
+            btn.prepend(colorBox);
+
+            btn.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                updateTaskStatus(taskId, s);
+            });
+            dropdown.appendChild(btn);
+        });
+
+        document.body.appendChild(dropdown);
+        __openStatusDropdown = dropdown;
+        // Remember which anchor opened this dropdown (for toggle behavior)
+        __openStatusDropdownAnchor = anchorEl;
+
+        // Positioning: below the anchorEl if possible; otherwise adjust to fit viewport
+        const rect = anchorEl.getBoundingClientRect();
+        const ddRect = dropdown.getBoundingClientRect();
+        const margin = 8;
+
+        // initial top/left
+        let top = rect.bottom + margin;
+        let left = rect.left;
+
+        // If dropdown would overflow right, adjust
+        if (left + ddRect.width > window.innerWidth - 8) {
+            left = Math.max(8, window.innerWidth - ddRect.width - 8);
+        }
+
+        // If dropdown would overflow bottom, try place above anchor
+        // recalc ddRect after appended (height known)
+        const ddHeight = dropdown.getBoundingClientRect().height;
+        if (top + ddHeight > window.innerHeight - 8) {
+            top = rect.top - ddHeight - margin;
+            if (top < 8) top = 8;
+        }
+
+        dropdown.style.left = left + 'px';
+        dropdown.style.top = top + 'px';
+
+        // close when clicking outside
+        __outsideClickHandler = function (e) {
+            if (!dropdown.contains(e.target) && !anchorEl.contains(e.target)) {
+                closeStatusDropdown();
+            }
+        };
+        document.addEventListener('click', __outsideClickHandler);
+
+        // close on escape
+        __escapeHandler = function (e) {
+            if (e.key === 'Escape') closeStatusDropdown();
+        };
+        document.addEventListener('keydown', __escapeHandler);
+    }
+
+    // ==========================
+    // RENDER DAY TASKS MODIFIED
+    // ==========================
     function renderDayTasks(dateStr) {
         const container = document.getElementById('dayTasksList');
         const title = document.getElementById('dayTasksTitle');
@@ -1951,14 +2649,19 @@
             '</tr></thead><tbody>';
 
         visible.forEach(t => {
-            const statusClass = 'tag-' + t.status.replace(/\s+/g, '-');
-            const priorityClass = 'tag-' + t.priority;
-            html += `<tr class="clickable-row" onclick="selectTaskForEdit('${t.id}')">
+            const prClass = 'tag-' + (t.priority || '');
+            const statusClass = STATUS_META[t.status]?.cls || 'tag-Aberto';
+
+            html += `<tr>
                 <td>${t.title}</td>
                 <td>${t.responsible}</td>
                 <td>${getCompanyNameById(t.companyId)}</td>
-                <td><span class="tag ${statusClass}">${t.status}</span></td>
-                <td><span class="tag ${priorityClass}">${t.priority}</span></td>
+                <td data-taskid="${t.id}" class="status-cell">` +
+                    // mostra a tag colorida (clicável) — o onclick chama openStatusDropdown
+                    `<span class="tag ${statusClass}" ` +
+                    `onclick="(function(e){ e.stopPropagation(); const el = e.currentTarget; openStatusDropdown('${t.id}', el); })(event)">${t.status}</span>` +
+                `</td>
+                <td><span class="tag ${prClass}">${t.priority}</span></td>
             </tr>`;
         });
 
@@ -2049,7 +2752,7 @@
                 p.username = username;
                 p.password = pass;
                 p.observation = observation;
-                db.collection('passwords').doc(p.id).set(p);
+                try { db.collection('passwords').doc(p.id).set(p); } catch (e) { /* ignore */ }
             }
         } else {
             const newPassword = {
@@ -2062,7 +2765,7 @@
                 observation
             };
             passwords.push(newPassword);
-            db.collection('passwords').doc(newPassword.id).set(newPassword);
+            try { db.collection('passwords').doc(newPassword.id).set(newPassword); } catch (e) { /* ignore */ }
         }
 
         resetPasswordForm();
@@ -2280,7 +2983,7 @@
         if (!confirm('Deseja realmente excluir esta senha?')) return;
 
         passwords = passwords.filter(p => p.id !== id);
-        db.collection('passwords').doc(id).delete();
+        try { db.collection('passwords').doc(id).delete(); } catch (e) { /* ignore */ }
         renderPasswordsTable();
     }
 
@@ -2291,9 +2994,13 @@
 
         const savedUser = localStorage.getItem('miniERP_currentUser');
         if (savedUser) {
-            currentUser = JSON.parse(savedUser);
-            applyAutoCarryOver();
-            showApp();
+            try {
+                currentUser = JSON.parse(savedUser);
+                applyAutoCarryOver();
+                showApp();
+            } catch (e) {
+                console.error('Erro ao restaurar sessão:', e);
+            }
         } else {
             showLogin();
         }
@@ -2320,6 +3027,9 @@
         if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
 
         renderPasswordCompanySelect();
+        renderCompaniesTable();
+        renderUsersTable();
+        renderTaskFilterOptions();
     });
 </script>
 
