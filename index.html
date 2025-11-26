@@ -2,11 +2,12 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Tarefou-se!</title>
+    <title>Tarefou-se! (Segura)</title>
 
     <!-- Firebase (versão compat para uso simples em HTML) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 
     <style>
         * {
@@ -14,7 +15,6 @@
             font-family: Arial, Helvetica, sans-serif;
         }
 
-        /* Fundo padrão da aplicação (área depois do login) */
         body {
             margin: 0;
             padding: 0;
@@ -31,8 +31,7 @@
             color: inherit;
         }
 
-        /* LOGIN – fundo em tela cheia com a capivara
-           >>> Troque "capivara-login.png" pelo nome/caminho da sua imagem. */
+        /* LOGIN */
         #loginView {
             min-height: 100vh;
             display: flex;
@@ -65,6 +64,7 @@
 
         input[type="text"],
         input[type="password"],
+        input[type="email"],
         input[type="date"],
         select,
         textarea {
@@ -85,6 +85,7 @@
 
         input[type="text"]:focus,
         input[type="password"]:focus,
+        input[type="email"]:focus,
         input[type="date"]:focus,
         select:focus,
         textarea:focus {
@@ -110,6 +111,17 @@
 
         button:hover {
             background: #185abc;
+        }
+
+        button:disabled {
+            opacity: 0.7;
+            cursor: default;
+        }
+
+        button:focus,
+        a:focus {
+            outline: 2px solid #1a73e8;
+            outline-offset: 2px;
         }
 
         .btn-secondary {
@@ -144,6 +156,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
         }
 
         header .logo {
@@ -151,15 +165,27 @@
             font-size: 18px;
         }
 
+        nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
         nav a {
-            margin-right: 12px;
+            margin-right: 0;
             color: #fff;
             font-size: 14px;
             cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 6px;
+        }
+
+        nav a:hover {
+            background: #495057;
         }
 
         nav a.active {
-            text-decoration: underline;
+            background: #495057;
             font-weight: bold;
         }
 
@@ -214,6 +240,11 @@
             font-size: 16px;
         }
 
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -228,6 +259,11 @@
 
         th {
             background: #f8f9fa;
+            cursor: default;
+        }
+
+        td a {
+            word-break: break-all;
         }
 
         .tag {
@@ -267,6 +303,7 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 8px;
+            gap: 8px;
         }
 
         .calendar-header span {
@@ -348,30 +385,20 @@
             text-decoration: underline dotted;
         }
 
-        /* Hover específico para a tabela de senhas */
-        #passwordsTable table tbody tr:hover {
-            background: #f1f3f5;
-        }
-
-        /* Hover para Empresas, Tarefas e Usuários */
+        #passwordsTable table tbody tr:hover,
         #companiesTable table tbody tr:hover,
         #tasksTable table tbody tr:hover,
-        #usersTable table tbody tr:hover {
-            background: #f1f3f5;
-        }
-
-        /* Hover para Tarefas do Dia */
+        #usersTable table tbody tr:hover,
         #dayTasksList table tbody tr:hover {
             background: #f1f3f5;
         }
 
-        /* Toast de "Copiado!" */
         .copy-toast {
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(0,0,0,0.85);
             color: #fff;
             padding: 8px 16px;
             border-radius: 20px;
@@ -386,7 +413,6 @@
             opacity: 1;
         }
 
-        /* Modal de escolha de recorrência */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -446,7 +472,6 @@
             }
         }
 
-        /* dropdown menu style */
         .status-dropdown {
             position: fixed;
             min-width: 160px;
@@ -456,12 +481,9 @@
             z-index: 20000;
             padding: 6px;
             overflow: hidden;
-
-            /* COR FIXA (evita herdar color do header) */
             color: #222 !important;
         }
 
-        /* garantir que os botões do dropdown tenham texto escuro e boa legibilidade */
         .status-dropdown button {
             display: block;
             width: 100%;
@@ -472,7 +494,7 @@
             cursor: pointer;
             font-weight: 600;
             border-radius: 6px;
-            color: #222 !important; /* forçar cor legível */
+            color: #222 !important;
             outline: none;
         }
 
@@ -485,7 +507,6 @@
             vertical-align: middle;
             margin-right: 8px;
         }
-
     </style>
 </head>
 <body>
@@ -496,12 +517,16 @@
         <h1>Tarefou-se!</h1>
         <form id="loginForm">
             <div class="error" id="loginError" style="display:none;"></div>
-            <label for="loginUser">Usuário</label>
-            <input type="text" id="loginUser" required>
+            <label for="loginUser">E-mail</label>
+            <input type="email" id="loginUser" required>
             <label for="loginPass">Senha</label>
             <input type="password" id="loginPass" required>
-            <button type="submit" style="width:100%; margin-top:8px;">Entrar</button>
+            <button type="submit" id="loginButton" style="width:100%; margin-top:8px;">Entrar</button>
         </form>
+        <p id="loginHint" class="small-text" style="margin-top:8px;">
+            Acesso via <strong>e-mail e senha</strong> cadastrados no Firebase Authentication.<br>
+            Peça ao Gestor para criar seu usuário e definir seu perfil em "Usuários".
+        </p>
     </div>
 </div>
 
@@ -527,16 +552,14 @@
         <!-- DASHBOARD -->
         <section id="dashboardSection" class="section active">
             <div class="grid">
-                <!-- Calendário + Tarefas em andamento -->
                 <div class="calendar-container">
                     <div class="calendar-header">
-                        <button class="btn-secondary" onclick="changeMonth(-1)">&lt;</button>
+                        <button class="btn-secondary" onclick="changeMonth(-1)" aria-label="Mês anterior">&lt;</button>
                         <span id="monthLabel"></span>
-                        <button class="btn-secondary" onclick="changeMonth(1)">&gt;</button>
+                        <button class="btn-secondary" onclick="changeMonth(1)" aria-label="Próximo mês">&gt;</button>
                     </div>
                     <div class="calendar" id="calendar"></div>
 
-                    <!-- Tarefas em andamento -->
                     <div class="card" style="margin-top:10px;">
                         <h2>Tarefas em andamento</h2>
                         <div id="inProgressList" class="small-text">
@@ -545,7 +568,6 @@
                     </div>
                 </div>
 
-                <!-- Lado direito: Cadastro + Tarefas do dia -->
                 <div>
                     <div class="card">
                         <h2>Cadastro de tarefas</h2>
@@ -620,7 +642,6 @@
                     <div class="card">
                         <div class="flex-row" style="align-items:center; justify-content:space-between; gap:8px;">
                             <h2 id="dayTasksTitle" style="margin-bottom:0;">Tarefas do dia</h2>
-                            <!-- Filtro de responsáveis (somente Gestor) -->
                             <div id="dayTasksFilterContainer" class="small-text" style="display:none;">
                                 <label for="dayTasksResponsibleFilter" style="margin-right:4px;">Responsável:</label>
                                 <select id="dayTasksResponsibleFilter" onchange="setDayTasksResponsibleFilter(this.value)">
@@ -652,7 +673,6 @@
                         </div>
                     </div>
 
-                    <!-- LINHA AJUSTADA: Regime + Checkbox + Botões alinhados -->
                     <div class="flex-row" style="align-items:flex-end;">
                         <div class="flex-1">
                             <label for="companyRegime">Regime Tributário</label>
@@ -662,7 +682,13 @@
                                 <option value="Lucro Presumido">Lucro Presumido</option>
                                 <option value="Lucro Real">Lucro Real</option>
                                 <option value="MEI">MEI</option>
-                                <option value="Outro">Outro</option>
+                                <option value="Livro Caixa">Livro Caixa</option>
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <label for="companyOperator">Operador responsável</label>
+                            <select id="companyOperator">
+                                <option value="">-- Selecionar --</option>
                             </select>
                         </div>
                         <div class="flex-1" style="display:flex; align-items:flex-end; justify-content:flex-end; gap:12px;">
@@ -681,7 +707,6 @@
                         </div>
                     </div>
 
-                    <!-- NOVO: campo data de início do serviço BPO -->
                     <div class="flex-row" style="align-items:center;">
                         <div class="flex-1">
                             <label for="companyBPOStart">Data de início do serviço BPO</label>
@@ -711,7 +736,6 @@
             <div class="card">
                 <h2>Todas as tarefas</h2>
 
-                <!-- Filtros -->
                 <div class="flex-row" style="margin-bottom:10px; flex-wrap:wrap; align-items:flex-end;">
                     <div class="flex-1">
                         <label for="filterStartDate">Data inicial</label>
@@ -740,7 +764,6 @@
                     </div>
                 </div>
 
-                <!-- Botão para excluir selecionadas -->
                 <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
                     <button id="deleteSelectedBtn" type="button" class="btn-secondary" onclick="deleteSelectedTasks()" style="display:none;">
                         Excluir selecionadas
@@ -756,7 +779,8 @@
             <div class="card">
                 <h2>Senhas por empresa</h2>
                 <p class="small-text">
-                    Gestores podem cadastrar/alterar senhas. Operadores possuem apenas visualização.
+                    Gestores podem cadastrar/alterar senhas. Operadores possuem apenas visualização.<br>
+                    
                 </p>
                 <form id="passwordForm">
                     <div class="flex-row">
@@ -822,20 +846,21 @@
         <!-- USUÁRIOS -->
         <section id="usersSection" class="section">
             <div class="card">
-                <h2>Cadastro de usuários</h2>
+                <h2>Cadastro de usuários (vínculo com Firebase Auth)</h2>
                 <p class="small-text">
-                    Somente Gestores devem cadastrar usuários.<br>
-                    
+                    1. Crie o usuário no <strong>Firebase Authentication (e-mail/senha)</strong> pelo console.<br>
+                    2. Depois, cadastre aqui o e-mail, nome e perfil (Gestor ou Operador).<br>
+                    3. As permissões no Firestore podem usar este perfil para restringir acesso.
                 </p>
                 <form id="userForm">
                     <div class="flex-row">
                         <div class="flex-1">
-                            <label for="userName">Usuário</label>
-                            <input type="text" id="userName" required>
+                            <label for="userEmail">E-mail (login)</label>
+                            <input type="email" id="userEmail" required>
                         </div>
                         <div class="flex-1">
-                            <label for="userPassword">Senha</label>
-                            <input type="text" id="userPassword" required>
+                            <label for="userName">Nome de exibição</label>
+                            <input type="text" id="userName" required>
                         </div>
                         <div class="flex-1">
                             <label for="userRole">Perfil</label>
@@ -857,7 +882,7 @@
     </main>
 </div>
 
-<!-- Modal de escolha (aplicar apenas esta ocorrência ou todas) -->
+<!-- Modal recorrência -->
 <div id="recurrenceModal" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
     <div class="modal" role="document">
         <h3 id="recurrenceModalTitle">Escolha</h3>
@@ -865,7 +890,7 @@
 
         <div class="options">
             <label><input type="radio" name="recurrenceChoice" value="this" checked> Apenas esta tarefa selecionada</label>
-            <label><input type="radio" name="recurrenceChoice" value="all"> Todas as tarefas das séries</label>
+            <label><input type="radio" name="recurrenceChoice" value="all"> Todas as tarefas da série</label>
         </div>
 
         <div class="buttons">
@@ -875,7 +900,7 @@
     </div>
 </div>
 
-<!-- Toast de cópia -->
+<!-- Toast -->
 <div id="copyToast" class="copy-toast">Copiado!</div>
 
 <script>
@@ -893,13 +918,14 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const auth = firebase.auth();
 
-    // ========================== DADOS ==========================
+    // ========================== DADOS EM MEMÓRIA ==========================
     let users = [];
     let companies = [];
     let tasks = [];
     let passwords = [];
-    let currentUser = null;
+    let currentUser = null; // { id (email), email, username, role }
 
     let currentMonth;
     let currentYear;
@@ -917,67 +943,76 @@
 
     let dayTasksSortField = null;
     let dayTasksSortDirection = 'asc';
-    let dayTasksFilterResponsible = ''; // filtro de responsável nas tarefas do dia (apenas Gestor)
+    let dayTasksFilterResponsible = '';
 
-    // Selection set for multi-delete in tasks page
     const selectedTaskIds = new Set();
 
-    // Keep a reference to the open dropdown so we can close it
     let __openStatusDropdown = null;
-    // Track anchor element for toggle behavior
     let __openStatusDropdownAnchor = null;
     let __outsideClickHandler = null;
     let __escapeHandler = null;
 
-    // ========================== FUNÇÕES AUXILIARES ==========================
+    // ========================== AUXILIARES GERAIS ==========================
     async function loadData() {
+        // zera caches locais
+        users = [];
+        companies = [];
+        tasks = [];
+        passwords = [];
+
+        // Carrega usuários
         try {
             const usersSnapshot = await db.collection('users').get();
-            users = [];
-            usersSnapshot.forEach(doc => users.push(doc.data()));
+            usersSnapshot.forEach(doc => {
+                users.push({ id: doc.id, ...doc.data() });
+            });
+        } catch (e) {
+            console.warn("Erro ao carregar 'users' (possível falta de auth):", e);
+        }
 
+        // Carrega empresas
+        try {
             const companiesSnapshot = await db.collection('companies').get();
-            companies = [];
             companiesSnapshot.forEach(doc => {
-                const c = doc.data();
-                // garantir compatibilidade se o campo não existir
+                const c = { id: doc.id, ...doc.data() };
                 c.activeBPO = !!c.activeBPO;
-                c.bpoStart = c.bpoStart || ''; // novo campo: data de início do BPO (YYYY-MM-DD)
+                c.bpoStart = c.bpoStart || '';
+                c.operatorResponsible = c.operatorResponsible || '';
                 companies.push(c);
             });
-
-            const tasksSnapshot = await db.collection('tasks').get();
-            tasks = [];
-            tasksSnapshot.forEach(doc => tasks.push(doc.data()));
-
-            const passwordsSnapshot = await db.collection('passwords').get();
-            passwords = [];
-            passwordsSnapshot.forEach(doc => passwords.push(doc.data()));
         } catch (e) {
-            console.error("Erro ao carregar dados do Firestore (rodando offline ou sem permissão?):", e);
-            // fallback: manter arrays vazios — ensureDefaultAdmin cuidará do admin local
+            console.warn("Erro ao carregar 'companies':", e);
         }
-    }
 
-    function saveUsers() {
-        users.forEach(u => {
-            try { db.collection('users').doc(u.id).set(u); } catch (e) { /* ignore */ }
-        });
-    }
-    function saveCompanies() {
-        companies.forEach(c => {
-            try { db.collection('companies').doc(c.id).set(c); } catch (e) { /* ignore */ }
-        });
-    }
-    function saveTasks() {
-        tasks.forEach(t => {
-            try { db.collection('tasks').doc(t.id).set(t); } catch (e) { /* ignore */ }
-        });
-    }
-    function savePasswords() {
-        passwords.forEach(p => {
-            try { db.collection('passwords').doc(p.id).set(p); } catch (e) { /* ignore */ }
-        });
+        // Carrega tarefas (filtrando por perfil para reduzir leituras)
+        try {
+            tasks = [];
+            if (currentUser) {
+                let query = db.collection('tasks');
+                if (currentUser.role !== 'Gestor') {
+                    // Operador vê apenas as tarefas dele
+                    query = query.where('responsible', '==', currentUser.username);
+                }
+                const tasksSnapshot = await query.get();
+                tasksSnapshot.forEach(doc => {
+                    const t = { id: doc.id, ...doc.data() };
+                    tasks.push(t);
+                });
+            }
+        } catch (e) {
+            console.warn("Erro ao carregar 'tasks':", e);
+        }
+
+        // Carrega senhas
+        try {
+            const passwordsSnapshot = await db.collection('passwords').get();
+            passwordsSnapshot.forEach(doc => {
+                const p = { id: doc.id, ...doc.data() };
+                passwords.push(p);
+            });
+        } catch (e) {
+            console.warn("Erro ao carregar 'passwords':", e);
+        }
     }
 
     function generateId() {
@@ -1020,23 +1055,8 @@
         return `${minutes}min`;
     }
 
-    function ensureDefaultAdmin() {
-        // garante admin local se não existir — útil se Firestore não carregou
-        if (!users.some(u => u.username === 'admin')) {
-            const adminUser = {
-                id: generateId(),
-                username: 'admin',
-                password: '123',
-                role: 'Gestor'
-            };
-            users.push(adminUser);
-            try { db.collection('users').doc(adminUser.id).set(adminUser); } catch (e) { /* ignore write error */ }
-        }
-    }
-
     function applyStatusChange(task, newStatus) {
         const now = Date.now();
-
         if (typeof task.timeSpentMs !== 'number') task.timeSpentMs = 0;
         if (typeof task.currentStart !== 'number') task.currentStart = null;
 
@@ -1047,11 +1067,9 @@
             task.timeSpentMs += now - task.currentStart;
             task.currentStart = null;
         }
-
         if (newStatus === 'Em andamento') {
             task.currentStart = now;
         }
-
         task.status = newStatus;
     }
 
@@ -1071,7 +1089,11 @@
             }
         });
 
-        if (changed) saveTasks();
+        if (changed) {
+            tasks.forEach(t => {
+                try { db.collection('tasks').doc(t.id).set(t); } catch (e) {}
+            });
+        }
     }
 
     function getVisibleTasks() {
@@ -1090,7 +1112,33 @@
         });
     }
 
-    // ========================== LOGIN / SESSÃO ==========================
+    // ========= NOVO: intervalo padrão de 1 semana para a página de Tarefas =========
+    function getDefaultWeekRangeFromToday() {
+        const today = new Date();
+        const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const end = new Date(start);
+        end.setDate(end.getDate() + 6); // hoje + 6 dias = 7 dias de intervalo
+        return {
+            start: dateToISO(start),
+            end: dateToISO(end)
+        };
+    }
+
+    function setDefaultTaskWeekFilter(applyToInputs = true) {
+        const range = getDefaultWeekRangeFromToday();
+        taskFilterStart = range.start;
+        taskFilterEnd = range.end;
+
+        if (applyToInputs) {
+            const startInput = document.getElementById('filterStartDate');
+            const endInput = document.getElementById('filterEndDate');
+            if (startInput) startInput.value = range.start;
+            if (endInput) endInput.value = range.end;
+        }
+    }
+    // =====================================================================
+
+    // ========================== LOGIN / AUTH ==========================
     function showLogin() {
         document.getElementById('loginView').style.display = 'flex';
         document.getElementById('appView').style.display = 'none';
@@ -1109,18 +1157,15 @@
         document.getElementById('nav-tasks').style.display =
             currentUser.role === 'Gestor' ? 'inline-block' : 'none';
 
-        // Senhas visível para Gestor e Operador
         document.getElementById('nav-passwords').style.display = 'inline-block';
 
-        // Form de senhas só para Gestor (Operador apenas visualiza)
         const passwordForm = document.getElementById('passwordForm');
         if (passwordForm) {
             passwordForm.style.display = currentUser.role === 'Gestor' ? 'block' : 'none';
         }
 
-        // botão excluir selecionadas só para gestor
         const delSel = document.getElementById('deleteSelectedBtn');
-        if (delSel) delSel.style.display = currentUser.role === 'Gestor' ? 'inline-block' : 'none';
+        if (delSel) delSel.style.display = currentUser.role === 'Gestor' ? 'inline-block' : 'inline-block';
 
         selectedDate = getTodayStr();
         resetTaskForm();
@@ -1130,44 +1175,137 @@
 
     async function handleLogin(event) {
         event.preventDefault();
-        const userInput = document.getElementById('loginUser').value.trim();
-        const pass = document.getElementById('loginPass').value;
+        const emailInput = document.getElementById('loginUser');
+        const passInput = document.getElementById('loginPass');
         const errorDiv = document.getElementById('loginError');
+        const loginButton = document.getElementById('loginButton');
 
-        // Se a lista users ainda não foi carregada (ou está vazia), garantir admin local
-        if (!users || users.length === 0) {
-            ensureDefaultAdmin();
-        }
+        const email = (emailInput.value || '').trim().toLowerCase();
+        const password = passInput.value;
 
-        const found = users.find(u => u.username === userInput && u.password === pass);
-
-        if (!found) {
-            // feedback mais claro
+        if (!email || !password) {
             errorDiv.style.display = 'block';
-            errorDiv.innerText = 'Usuário ou senha inválidos. Verifique e tente novamente (usuário padrão: admin / 123).';
+            errorDiv.innerText = 'Preencha e-mail e senha.';
             return;
         }
 
-        currentUser = { id: found.id, username: found.username, role: found.role };
-        localStorage.setItem('miniERP_currentUser', JSON.stringify(currentUser));
+        loginButton.disabled = true;
+        loginButton.textContent = 'Entrando...';
         errorDiv.style.display = 'none';
+
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+            // onAuthStateChanged vai cuidar do resto
+        } catch (err) {
+            console.error('Erro de login:', err);
+            let msg = 'Falha ao fazer login.';
+            if (err.code === 'auth/user-not-found') msg = 'Usuário não encontrado.';
+            if (err.code === 'auth/wrong-password') msg = 'Senha incorreta.';
+            if (err.code === 'auth/invalid-email') msg = 'E-mail inválido.';
+            errorDiv.style.display = 'block';
+            errorDiv.innerText = msg;
+            loginButton.disabled = false;
+            loginButton.textContent = 'Entrar';
+        }
+    }
+
+    async function onAuthUserLoggedIn(firebaseUser) {
+        if (!firebaseUser) {
+            currentUser = null;
+            showLogin();
+            return;
+        }
+
+        const email = (firebaseUser.email || '').toLowerCase();
+        if (!email) {
+            alert('Conta sem e-mail não é suportada por esta aplicação.');
+            try { await auth.signOut(); } catch (e) {}
+            currentUser = null;
+            showLogin();
+            return;
+        }
+
+        // Primeiro busca o perfil do usuário (users/<email>)
+        let userDoc = null;
+        try {
+            userDoc = await db.collection('users').doc(email).get();
+        } catch (e) {
+            console.error('Erro ao buscar perfil de usuário:', e);
+        }
+
+        if (!userDoc || !userDoc.exists) {
+            alert('Seu login foi autenticado, mas não há cadastro de perfil para este e-mail.\n' +
+                  'Peça ao Gestor para cadastrá-lo na aba "Usuários".');
+            try { await auth.signOut(); } catch (e) {}
+            currentUser = null;
+            showLogin();
+            return;
+        }
+
+        const data = userDoc.data() || {};
+        currentUser = {
+            id: userDoc.id,
+            email: email,
+            username: data.username || email,
+            role: data.role || 'Operador'
+        };
+
+        // Agora carrega os dados de acordo com o perfil (Gestor/Operador)
+        await loadData();
 
         applyAutoCarryOver();
         showApp();
+
+        const loginButton = document.getElementById('loginButton');
+        if (loginButton) {
+            loginButton.disabled = false;
+            loginButton.textContent = 'Entrar';
+        }
+        const errorDiv = document.getElementById('loginError');
+        if (errorDiv) errorDiv.style.display = 'none';
     }
 
-    function logout() {
-        currentUser = null;
+    async function logout() {
         editingUserId = null;
         editingCompanyId = null;
         editingTaskId = null;
         editingPasswordId = null;
-        localStorage.removeItem('miniERP_currentUser');
+        selectedTaskIds.clear();
+        try {
+            await auth.signOut();
+        } catch (e) {
+            console.error('Erro ao sair:', e);
+        }
+        currentUser = null;
         showLogin();
     }
 
     // ========================== NAVEGAÇÃO ==========================
     function showSection(sectionId) {
+        if (sectionId !== 'dashboardSection' && editingTaskId) {
+            const leave = confirm('Você está editando uma tarefa. Sair sem salvar?');
+            if (!leave) return;
+            cancelTaskEdit();
+        }
+        if (sectionId !== 'companiesSection' && editingCompanyId) {
+            const leave = confirm('Você está editando uma empresa. Sair sem salvar?');
+            if (!leave) return;
+            cancelCompanyEdit();
+        }
+        if (sectionId !== 'passwordsSection' && editingPasswordId) {
+            const leave = confirm('Você está editando uma senha. Sair sem salvar?');
+            if (!leave) return;
+            cancelPasswordEdit();
+        }
+        if (sectionId !== 'usersSection' && editingUserId) {
+            const leave = confirm('Você está editando um usuário. Sair sem salvar?');
+            if (!leave) return;
+            document.getElementById('userForm').reset();
+            editingUserId = null;
+            document.getElementById('userEmail').disabled = false;
+            document.getElementById('userSubmitBtn').textContent = 'Salvar usuário';
+        }
+
         if (sectionId === 'tasksSection' && (!currentUser || currentUser.role !== 'Gestor')) {
             alert('Apenas Gestores podem visualizar a página de tarefas.');
             sectionId = 'dashboardSection';
@@ -1190,7 +1328,6 @@
             document.getElementById('nav-users').classList.add('active');
         }
 
-        // Atualiza visibilidade do formulário de senhas conforme o perfil
         const passwordForm = document.getElementById('passwordForm');
         if (passwordForm && currentUser) {
             passwordForm.style.display = currentUser.role === 'Gestor' ? 'block' : 'none';
@@ -1201,6 +1338,7 @@
 
     function refreshAllUI() {
         renderUserSelect();
+        renderCompanyOperatorSelect();
         renderCompanySelect();
         renderTaskFilterOptions();
         renderTasksTable();
@@ -1210,7 +1348,7 @@
         renderCalendar();
         renderInProgressTasks();
         renderPasswordCompanySelect();
-        renderPasswordsTable(); // <<< garantir que a página de Senhas sempre atualize
+        renderPasswordsTable();
         renderDayTasksResponsibleFilter();
         if (selectedDate) renderDayTasks(selectedDate);
     }
@@ -1226,12 +1364,6 @@
         const recurrenceSelect = document.getElementById('taskRecurrence');
         if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
 
-        const userSelect = document.getElementById('taskUser');
-        if (userSelect && userSelect.options.length > 0) userSelect.selectedIndex = 0;
-
-        const companySelect = document.getElementById('taskCompany');
-        if (companySelect && companySelect.options.length > 0) companySelect.selectedIndex = 0;
-
         editingTaskId = null;
 
         document.getElementById('taskSubmitBtn').textContent = 'Salvar tarefa';
@@ -1243,37 +1375,43 @@
         resetTaskForm();
     }
 
-    // ========================== USUÁRIOS ==========================
+    // ========================== USUÁRIOS (PERFIS / ROLES) ==========================
     function renderUsersTable() {
         const container = document.getElementById('usersTable');
         if (!container) return;
+
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            container.innerHTML = '<p class="small-text">Apenas Gestores podem visualizar e gerenciar usuários.</p>';
+            return;
+        }
 
         if (!users.length) {
             container.innerHTML = '<p class="small-text">Nenhum usuário cadastrado.</p>';
             return;
         }
 
-        const isAdmin = currentUser && currentUser.username === 'admin';
+        const isGestor = currentUser.role === 'Gestor';
 
-        let html = '<table><thead><tr><th>Usuário</th><th>Perfil</th>';
-        if (isAdmin) html += '<th>Ações</th>';
+        let html = '<div class="table-wrapper"><table><thead><tr>' +
+            '<th>E-mail</th><th>Nome</th><th>Perfil</th>';
+        if (isGestor) html += '<th>Ações</th>';
         html += '</tr></thead><tbody>';
 
         users.forEach(u => {
-            html += `<tr><td>${u.username}</td><td>${u.role}</td>`;
-            if (isAdmin) {
-                if (u.username === 'admin') {
-                    html += '<td>-</td>';
-                } else {
-                    html += `<td class="actions">
-                        <button onclick="editUser('${u.id}')">Editar</button>
-                        <button onclick="deleteUser('${u.id}')">Excluir</button>
-                    </td>`;
-                }
+            html += `<tr>
+                <td>${u.email || u.id}</td>
+                <td>${u.username || '-'}</td>
+                <td>${u.role || '-'}</td>`;
+            if (isGestor) {
+                html += `<td class="actions">
+                    <button onclick="editUser('${u.id}')">Editar</button>
+                    <button onclick="deleteUser('${u.id}')">Excluir</button>
+                </td>`;
             }
             html += '</tr>';
         });
-        html += '</tbody></table>';
+
+        html += '</tbody></table></div>';
         container.innerHTML = html;
     }
 
@@ -1312,7 +1450,7 @@
         select.appendChild(placeholder);
 
         if (currentUser.role === 'Operador') {
-            const u = users.find(u => u.id === currentUser.id || u.username === currentUser.username);
+            const u = users.find(u => (u.email || u.id).toLowerCase() === currentUser.email);
             if (u) {
                 const opt = document.createElement('option');
                 opt.value = u.username;
@@ -1329,125 +1467,181 @@
         }
     }
 
-    function handleUserForm(event) {
+    async function handleUserForm(event) {
         event.preventDefault();
-        const nameInput = document.getElementById('userName');
-        const passwordInput = document.getElementById('userPassword');
-        const roleSelect = document.getElementById('userRole');
-        theSubmitBtn = document.getElementById('userSubmitBtn');
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Somente Gestores podem cadastrar usuários/perfis.');
+            return;
+        }
 
+        const emailInput = document.getElementById('userEmail');
+        const nameInput = document.getElementById('userName');
+        const roleSelect = document.getElementById('userRole');
+        const submitBtn = document.getElementById('userSubmitBtn');
+
+        const email = (emailInput.value || '').trim().toLowerCase();
         const name = nameInput.value.trim();
-        const password = passwordInput.value;
         const role = roleSelect.value;
 
-        if (editingUserId) {
-            if (!currentUser || currentUser.username !== 'admin') {
-                alert('Somente o usuário admin pode alterar usuários.');
-                return;
+        if (!email || !name || !role) {
+            alert('Preencha e-mail, nome e perfil.');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Salvando...';
+
+        try {
+            if (editingUserId) {
+                const u = users.find(u => u.id === editingUserId);
+                if (u) {
+                    u.email = email;
+                    u.username = name;
+                    u.role = role;
+                    await db.collection('users').doc(editingUserId).set({
+                        email,
+                        username: name,
+                        role
+                    });
+                }
+                editingUserId = null;
+                emailInput.disabled = false;
+                submitBtn.textContent = 'Salvar usuário';
+            } else {
+                await db.collection('users').doc(email).set({
+                    email,
+                    username: name,
+                    role
+                });
+                // atualiza cache local sem recarregar tudo
+                users.push({
+                    id: email,
+                    email,
+                    username: name,
+                    role
+                });
             }
-            const u = users.find(u => u.id === editingUserId);
-            if (u) {
-                u.password = password;
-                u.role = role;
-                db.collection('users').doc(u.id).set(u);
-            }
-            editingUserId = null;
-            nameInput.disabled = false;
-            theSubmitBtn.textContent = 'Salvar usuário';
+
             document.getElementById('userForm').reset();
             renderUsersTable();
             renderUserSelect();
+            renderCompanyOperatorSelect();
             renderTaskFilterOptions();
             renderDayTasksResponsibleFilter();
-            return;
+            showCopyToast('Usuário/perfil salvo com sucesso!');
+        } catch (e) {
+            console.error('Erro ao salvar usuário:', e);
+            alert('Erro ao salvar usuário. Verifique as regras do Firestore.');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Salvar usuário';
         }
-
-        if (!currentUser || currentUser.role !== 'Gestor') {
-            alert('Somente Gestores podem cadastrar usuários.');
-            return;
-        }
-
-        if (!name || !password) {
-            alert('Preencha usuário e senha.');
-            return;
-        }
-
-        if (users.some(u => u.username === name)) {
-            alert('Já existe um usuário com esse nome.');
-            return;
-        }
-
-        const newUser = {
-            id: generateId(),
-            username: name,
-            password: password,
-            role: role
-        };
-        users.push(newUser);
-        try { db.collection('users').doc(newUser.id).set(newUser); } catch (e) { /* ignore */ }
-
-        document.getElementById('userForm').reset();
-        renderUsersTable();
-        renderUserSelect();
-        renderTaskFilterOptions();
-        renderDayTasksResponsibleFilter();
     }
 
     function editUser(id) {
-        if (!currentUser || currentUser.username !== 'admin') {
-            alert('Somente o usuário admin pode editar usuários.');
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Somente Gestores podem editar usuários.');
             return;
         }
         const u = users.find(u => u.id === id);
         if (!u) return;
 
         editingUserId = id;
+
+        const emailInput = document.getElementById('userEmail');
         const nameInput = document.getElementById('userName');
-        const passwordInput = document.getElementById('userPassword');
         const roleSelect = document.getElementById('userRole');
         const submitBtn = document.getElementById('userSubmitBtn');
 
-        nameInput.value = u.username;
-        nameInput.disabled = true;
-        passwordInput.value = u.password || '';
-        roleSelect.value = u.role;
+        emailInput.value = u.email || u.id;
+        emailInput.disabled = true;
+        nameInput.value = u.username || '';
+        roleSelect.value = u.role || 'Operador';
         submitBtn.textContent = 'Atualizar usuário';
     }
 
-    function deleteUser(id) {
-        if (!currentUser || currentUser.username !== 'admin') {
-            alert('Somente o usuário admin pode excluir usuários.');
+    async function deleteUser(id) {
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Somente Gestores podem excluir usuários/perfis.');
             return;
         }
         const u = users.find(u => u.id === id);
         if (!u) return;
-        if (u.username === 'admin') {
-            alert('Você não pode excluir o usuário admin.');
-            return;
-        }
-        if (!confirm('Deseja realmente excluir este usuário?')) return;
 
-        users = users.filter(us => us.id !== id);
-        try { db.collection('users').doc(id).delete(); } catch (e) { /* ignore */ }
-        renderUsersTable();
-        renderUserSelect();
-        renderTaskFilterOptions();
-        renderDayTasksResponsibleFilter();
+        if (!confirm('Deseja realmente excluir o cadastro deste usuário (apenas o perfil do Firestore, não a conta do Firebase Auth)?')) return;
+
+        try {
+            await db.collection('users').doc(id).delete();
+            users = users.filter(us => us.id !== id);
+            renderUsersTable();
+            renderUserSelect();
+            renderCompanyOperatorSelect();
+            renderTaskFilterOptions();
+            renderDayTasksResponsibleFilter();
+            showCopyToast('Usuário/perfil excluído.');
+        } catch (e) {
+            console.error('Erro ao excluir usuário:', e);
+            alert('Erro ao excluir usuário. Verifique as regras do Firestore.');
+        }
     }
 
     // ========================== EMPRESAS ==========================
+    function renderCompanyOperatorSelect() {
+        const select = document.getElementById('companyOperator');
+        if (!select) return;
+
+        select.innerHTML = '';
+
+        const operators = users.filter(u => (u.role || '').toLowerCase() === 'operador');
+
+        if (!operators.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Cadastre operadores na aba Usuários';
+            opt.disabled = true;
+            opt.selected = true;
+            select.appendChild(opt);
+            select.disabled = true;
+            return;
+        }
+
+        select.disabled = false;
+
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Selecione o operador responsável';
+        placeholder.disabled = true;
+        placeholder.selected = true;
+        select.appendChild(placeholder);
+
+        operators.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.username;
+            opt.textContent = o.username + ' (Operador)';
+            select.appendChild(opt);
+        });
+    }
+
     function handleCompanyForm(event) {
         event.preventDefault();
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Somente Gestores podem cadastrar/alterar empresas.');
+            return;
+        }
+
         const nameInput = document.getElementById('companyName');
         const cnpjInput = document.getElementById('companyCNPJ');
         const regimeSelect = document.getElementById('companyRegime');
+        const operatorSelect = document.getElementById('companyOperator');
         const activeCheckbox = document.getElementById('companyActiveBPO');
         const bpoStartInput = document.getElementById('companyBPOStart');
         const submitBtn = document.getElementById('companySubmitBtn');
         const cancelBtn = document.getElementById('companyCancelBtn');
+
         const name = nameInput.value.trim();
         const cnpj = cnpjInput ? cnpjInput.value.trim() : '';
         const regime = regimeSelect ? regimeSelect.value : '';
+        const operatorResponsible = operatorSelect ? operatorSelect.value : '';
         const active = !!(activeCheckbox && activeCheckbox.checked);
         const bpoStart = (bpoStartInput && bpoStartInput.value) ? bpoStartInput.value : '';
 
@@ -1457,54 +1651,50 @@
         }
 
         if (editingCompanyId) {
-            // >>> ALTERADO: agora qualquer Gestor pode alterar empresas <<<
-            if (!currentUser || currentUser.role !== 'Gestor') {
-                alert('Somente Gestores podem alterar empresas.');
-                return;
-            }
             const c = companies.find(c => c.id === editingCompanyId);
             if (c) {
                 c.name = name;
                 c.cnpj = cnpj || '';
                 c.regime = regime || '';
+                c.operatorResponsible = operatorResponsible || '';
                 c.activeBPO = active;
                 c.bpoStart = bpoStart || '';
-                try { db.collection('companies').doc(c.id).set(c); } catch (e) { /* ignore */ }
+                try { db.collection('companies').doc(c.id).set(c); } catch (e) {}
             }
             editingCompanyId = null;
             submitBtn.textContent = 'Adicionar empresa';
             if (cancelBtn) cancelBtn.style.display = 'none';
+            showCopyToast('Empresa atualizada com sucesso!');
         } else {
             const newCompany = {
                 id: generateId(),
-                name: name,
+                name,
                 cnpj: cnpj || '',
                 regime: regime || '',
+                operatorResponsible: operatorResponsible || '',
                 activeBPO: active,
                 bpoStart: bpoStart || ''
             };
             companies.push(newCompany);
-            try { db.collection('companies').doc(newCompany.id).set(newCompany); } catch (e) { /* ignore */ }
+            try { db.collection('companies').doc(newCompany.id).set(newCompany); } catch (e) {}
+            showCopyToast('Empresa cadastrada com sucesso!');
         }
 
         document.getElementById('companyForm').reset();
-        // reset regime select placeholder
         const reg = document.getElementById('companyRegime');
         if (reg) reg.value = '';
-        // ensure checkbox reset
         const chk = document.getElementById('companyActiveBPO');
         if (chk) chk.checked = false;
-        // reset BPO start date
         const bpo = document.getElementById('companyBPOStart');
         if (bpo) bpo.value = '';
+        const opSel = document.getElementById('companyOperator');
+        if (opSel) opSel.value = '';
 
         renderCompaniesTable();
         renderCompanySelect();
-        renderTaskFilterOptions();
         renderPasswordCompanySelect();
     }
 
-    // NOVA FUNÇÃO: cancelar edição de empresa (botão Voltar)
     function cancelCompanyEdit() {
         editingCompanyId = null;
         const form = document.getElementById('companyForm');
@@ -1512,16 +1702,15 @@
 
         const regimeSelect = document.getElementById('companyRegime');
         if (regimeSelect) regimeSelect.value = '';
-
+        const operatorSelect = document.getElementById('companyOperator');
+        if (operatorSelect) operatorSelect.value = '';
         const activeCheckbox = document.getElementById('companyActiveBPO');
         if (activeCheckbox) activeCheckbox.checked = false;
-
         const bpoStartInput = document.getElementById('companyBPOStart');
         if (bpoStartInput) bpoStartInput.value = '';
 
         const submitBtn = document.getElementById('companySubmitBtn');
         if (submitBtn) submitBtn.textContent = 'Adicionar empresa';
-
         const cancelBtn = document.getElementById('companyCancelBtn');
         if (cancelBtn) cancelBtn.style.display = 'none';
     }
@@ -1538,24 +1727,29 @@
         }
 
         document.getElementById('companiesCount').innerText = String(companies.length);
-
-        // contar ativos como cliente BPO (tratar undefined como false)
         const activeCount = companies.filter(c => !!c.activeBPO).length;
         document.getElementById('companiesActiveCount').innerText = String(activeCount);
 
-        // >>> ALTERADO: permissão baseada no perfil Gestor, não só username admin <<<
         const canManageCompanies = currentUser && currentUser.role === 'Gestor';
 
-        let html = '<table><thead><tr><th>Nome</th><th>CNPJ</th><th>Regime</th><th>Cliente ativo</th><th>Início BPO</th>';
+        let html = '<div class="table-wrapper"><table><thead><tr>' +
+            '<th>Nome</th><th>CNPJ</th><th>Regime</th><th>Operador responsável</th><th>Cliente ativo</th><th>Início BPO</th>';
         if (canManageCompanies) html += '<th>Ações</th>';
         html += '</tr></thead><tbody>';
 
         companies.forEach(c => {
             const cnpjDisplay = c.cnpj && c.cnpj.trim() ? c.cnpj : '-';
             const regimeDisplay = c.regime && c.regime.trim() ? c.regime : '-';
+            const operatorDisplay = c.operatorResponsible && c.operatorResponsible.trim() ? c.operatorResponsible : '-';
             const activeDisplay = c.activeBPO ? '<strong style="color:#155724;">Sim</strong>' : 'Não';
             const bpoStartDisplay = c.bpoStart ? formatDateBR(c.bpoStart) : '-';
-            html += `<tr><td>${c.name}</td><td>${cnpjDisplay}</td><td>${regimeDisplay}</td><td>${activeDisplay}</td><td>${bpoStartDisplay}</td>`;
+            html += `<tr>
+                <td>${c.name}</td>
+                <td>${cnpjDisplay}</td>
+                <td>${regimeDisplay}</td>
+                <td>${operatorDisplay}</td>
+                <td>${activeDisplay}</td>
+                <td>${bpoStartDisplay}</td>`;
             if (canManageCompanies) {
                 html += `<td class="actions">
                     <button onclick="editCompany('${c.id}')">Editar</button>
@@ -1564,7 +1758,7 @@
             }
             html += '</tr>';
         });
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
         container.innerHTML = html;
     }
 
@@ -1605,7 +1799,6 @@
     }
 
     function editCompany(id) {
-        // >>> ALTERADO: agora qualquer Gestor pode editar empresas <<<
         if (!currentUser || currentUser.role !== 'Gestor') {
             alert('Somente Gestores podem editar empresas.');
             return;
@@ -1614,65 +1807,50 @@
         if (!c) return;
 
         editingCompanyId = id;
-        const nameInput = document.getElementById('companyName');
-        const cnpjInput = document.getElementById('companyCNPJ');
-        const regimeSelect = document.getElementById('companyRegime');
-        const activeCheckbox = document.getElementById('companyActiveBPO');
-        const bpoStartInput = document.getElementById('companyBPOStart');
-        const submitBtn = document.getElementById('companySubmitBtn');
-        const cancelBtn = document.getElementById('companyCancelBtn');
 
-        nameInput.value = c.name || '';
-        cnpjInput.value = c.cnpj || '';
-        regimeSelect.value = c.regime || '';
-        activeCheckbox.checked = !!c.activeBPO;
-        bpoStartInput.value = c.bpoStart || '';
-        submitBtn.textContent = 'Atualizar empresa';
+        document.getElementById('companyName').value = c.name || '';
+        document.getElementById('companyCNPJ').value = c.cnpj || '';
+        document.getElementById('companyRegime').value = c.regime || '';
+        document.getElementById('companyOperator').value = c.operatorResponsible || '';
+        document.getElementById('companyActiveBPO').checked = !!c.activeBPO;
+        document.getElementById('companyBPOStart').value = c.bpoStart || '';
+        document.getElementById('companySubmitBtn').textContent = 'Atualizar empresa';
+        document.getElementById('companyCancelBtn').style.display = 'inline-block';
 
-        if (cancelBtn) cancelBtn.style.display = 'inline-block';
-
-        // --- NOVA PARTE: subir a página automaticamente para o formulário e focar o campo nome ---
         const formEl = document.getElementById('companyForm');
         if (formEl && formEl.scrollIntoView) {
-            // usa smooth scroll para melhor UX
             formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
-            // fallback: scroll to top
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-        // dar foco ao campo nome após pequeno delay (garante que o scroll/paint aconteceu)
-        setTimeout(() => {
-            try { nameInput.focus(); nameInput.select(); } catch (e) { /* ignore */ }
-        }, 450);
     }
 
     function deleteCompany(id) {
-        // >>> ALTERADO: agora qualquer Gestor pode excluir empresas <<<
         if (!currentUser || currentUser.role !== 'Gestor') {
             alert('Somente Gestores podem excluir empresas.');
             return;
         }
         if (!confirm('Deseja realmente excluir esta empresa?')) return;
         companies = companies.filter(c => c.id !== id);
-        try { db.collection('companies').doc(id).delete(); } catch (e) { /* ignore */ }
+        try { db.collection('companies').doc(id).delete(); } catch (e) {}
         renderCompaniesTable();
         renderCompanySelect();
-        renderTaskFilterOptions();
         renderPasswordCompanySelect();
+        showCopyToast('Empresa excluída.');
     }
 
-    // ========================== TAREFAS ==========================
-    // Helper: retorna os membros da série (todos os recorrentes relacionados ao mesmo 'baseId' ou, se não houver baseId, por comparação heurística)
+    // ========================== TAREFAS (recorrência, filtros, etc.) ==========================
     function getSeriesTasks(task) {
         if (!task) return [];
         if (task.baseId) {
             return tasks.filter(t => t.baseId === task.baseId);
         }
-        // Fallback heurística: mesma title, responsible, companyId e mesma recorrência
-        return tasks.filter(t => t.recurrence === task.recurrence &&
+        return tasks.filter(t =>
+            t.recurrence === task.recurrence &&
             t.title === task.title &&
             t.responsible === task.responsible &&
-            t.companyId === task.companyId);
+            t.companyId === task.companyId
+        );
     }
 
     function createTaskClone(baseTask, dateStr) {
@@ -1691,7 +1869,7 @@
             baseId: baseTask.baseId || baseTask.id
         };
         tasks.push(clone);
-        try { db.collection('tasks').doc(clone.id).set(clone); } catch (e) { /* ignore */ }
+        try { db.collection('tasks').doc(clone.id).set(clone); } catch (e) {}
     }
 
     function generateRecurrenceTasks(baseTask) {
@@ -1699,7 +1877,6 @@
         if (recurrence === 'Nenhuma') return;
         if (!baseTask.date) return;
 
-        // Guarantee baseId exists on base task
         if (!baseTask.baseId) baseTask.baseId = baseTask.id;
 
         const startDate = parseLocalDate(baseTask.date);
@@ -1744,10 +1921,6 @@
         }
     }
 
-    // ==========================
-    // Modal helper: mostra modal com opções "Apenas esta tarefa" / "Todas as tarefas"
-    // Retorna uma Promise que resolve 'this' | 'all' | null (null = cancel)
-    // ==========================
     function showRecurrenceModal(message, title = 'Escolha') {
         return new Promise((resolve) => {
             const overlay = document.getElementById('recurrenceModal');
@@ -1759,13 +1932,13 @@
             titleEl.innerText = title;
             msgEl.innerText = message;
 
-            // ensure default selection
             const radios = overlay.querySelectorAll('input[name="recurrenceChoice"]');
             radios.forEach(r => r.checked = (r.value === 'this'));
 
             function cleanup() {
                 confirmBtn.removeEventListener('click', onConfirm);
                 cancelBtn.removeEventListener('click', onCancel);
+                document.removeEventListener('keydown', onKeyDown);
                 overlay.style.display = 'none';
                 overlay.setAttribute('aria-hidden', 'true');
             }
@@ -1782,19 +1955,29 @@
                 resolve(null);
             }
 
+            function onKeyDown(e) {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    onCancel();
+                }
+            }
+
             confirmBtn.addEventListener('click', onConfirm);
             cancelBtn.addEventListener('click', onCancel);
+            document.addEventListener('keydown', onKeyDown);
 
             overlay.style.display = 'flex';
             overlay.setAttribute('aria-hidden', 'false');
         });
     }
 
-    // ==========================
-    // handleTaskForm agora é async para usar o modal quando necessário
-    // ==========================
     async function handleTaskForm(event) {
         event.preventDefault();
+        if (!currentUser) {
+            alert('Faça login para cadastrar tarefas.');
+            return;
+        }
+
         const title = document.getElementById('taskTitle').value.trim();
         const date = document.getElementById('taskDate').value;
         const responsible = document.getElementById('taskUser').value;
@@ -1814,17 +1997,13 @@
             if (!task) {
                 alert('Tarefa não encontrada para edição.');
             } else {
-                // If task is part of a recurrence series, ask the user via modal
                 if (task.recurrence && task.recurrence !== 'Nenhuma') {
                     const choice = await showRecurrenceModal(
                         'Esta tarefa faz parte de uma recorrência.\n\nEscolha "Apenas esta ocorrência" para aplicar somente a alteração nesta tarefa ou "Todas as tarefas" para aplicar a TODAS as tarefas.',
                         'Alterar tarefa recorrente'
                     );
 
-                    if (choice === null) {
-                        // user canceled
-                        return;
-                    }
+                    if (choice === null) return;
 
                     if (choice === 'all') {
                         const series = getSeriesTasks(task);
@@ -1836,8 +2015,7 @@
                             t.priority = priority;
                             t.description = description;
                             t.recurrence = recurrence;
-                            // Do NOT overwrite date for other occurrences
-                            try { db.collection('tasks').doc(t.id).set(t); } catch (e) { /* ignore */ }
+                            try { db.collection('tasks').doc(t.id).set(t); } catch (e) {}
                         });
                     } else {
                         applyStatusChange(task, status);
@@ -1848,7 +2026,7 @@
                         task.priority = priority;
                         task.description = description;
                         task.recurrence = recurrence;
-                        try { db.collection('tasks').doc(task.id).set(task); } catch (e) { /* ignore */ }
+                        try { db.collection('tasks').doc(task.id).set(task); } catch (e) {}
                     }
                 } else {
                     applyStatusChange(task, status);
@@ -1859,7 +2037,7 @@
                     task.priority = priority;
                     task.description = description;
                     task.recurrence = recurrence;
-                    try { db.collection('tasks').doc(task.id).set(task); } catch (e) { /* ignore */ }
+                    try { db.collection('tasks').doc(task.id).set(task); } catch (e) {}
                 }
             }
         } else {
@@ -1879,11 +2057,10 @@
                 baseId: null
             };
             if (status === 'Em andamento') baseTask.currentStart = now;
-            // set baseId so series can be tracked
             baseTask.baseId = baseTask.id;
 
             tasks.push(baseTask);
-            try { db.collection('tasks').doc(baseTask.id).set(baseTask); } catch (e) { /* ignore */ }
+            try { db.collection('tasks').doc(baseTask.id).set(baseTask); } catch (e) {}
             generateRecurrenceTasks(baseTask);
         }
 
@@ -1893,47 +2070,13 @@
         renderCalendar();
         renderInProgressTasks();
         if (selectedDate) renderDayTasks(selectedDate);
+        showCopyToast('Tarefa salva com sucesso!');
     }
 
-    // ==========================
-    // deleteCurrentEditingTask usa modal quando a tarefa é recorrente
-    // ==========================
     async function deleteCurrentEditingTask() {
         if (!editingTaskId) return;
-        const task = tasks.find(t => t.id === editingTaskId);
-        if (!task) return;
-
-        if (task.recurrence && task.recurrence !== 'Nenhuma') {
-            const choice = await showRecurrenceModal(
-                'Esta tarefa faz parte de uma recorrência.\n\nEscolha "Apenas esta tarefa" para aplicar somente a alteração nesta tarefa ou "Todas as tarefas" para aplicar a TODAS as tarefas.',
-                'Excluir tarefa recorrente'
-            );
-            if (choice === null) return;
-
-            if (choice === 'all') {
-                const series = getSeriesTasks(task);
-                if (!confirm(`Confirma excluir ${series.length} tarefas recorrentes?`)) return;
-                series.forEach(t => {
-                    tasks = tasks.filter(x => x.id !== t.id);
-                    try { db.collection('tasks').doc(t.id).delete(); } catch (e) { /* ignore */ }
-                });
-            } else {
-                if (!confirm('Deseja realmente excluir esta tarefa?')) return;
-                tasks = tasks.filter(t => t.id !== task.id);
-                try { db.collection('tasks').doc(task.id).delete(); } catch (e) { /* ignore */ }
-            }
-        } else {
-            if (!confirm('Deseja realmente excluir esta tarefa?')) return;
-            tasks = tasks.filter(t => t.id !== task.id);
-            try { db.collection('tasks').doc(task.id).delete(); } catch (e) { /* ignore */ }
-        }
-
+        await deleteTask(editingTaskId);
         resetTaskForm();
-        renderTasksTable();
-        renderTasksOverview();
-        renderCalendar();
-        renderInProgressTasks();
-        if (selectedDate) renderDayTasks(selectedDate);
     }
 
     function getFilteredTasksList() {
@@ -1968,15 +2111,16 @@
     }
 
     function clearTaskDateFilter() {
-        taskFilterStart = null;
-        taskFilterEnd = null;
+        // Em vez de remover o filtro, volta para o intervalo padrão de 1 semana
+        setDefaultTaskWeekFilter(true);
+
         taskFilterResponsible = null;
         taskFilterCompanyId = null;
 
-        document.getElementById('filterStartDate').value = '';
-        document.getElementById('filterEndDate').value = '';
-        document.getElementById('filterResponsible').value = '';
-        document.getElementById('filterCompany').value = '';
+        const respSelect = document.getElementById('filterResponsible');
+        const companySelect = document.getElementById('filterCompany');
+        if (respSelect) respSelect.value = '';
+        if (companySelect) companySelect.value = '';
 
         renderTasksTable();
     }
@@ -2035,6 +2179,8 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+
+        showCopyToast('Planilha exportada.');
     }
 
     function renderTasksTable() {
@@ -2053,8 +2199,7 @@
             return;
         }
 
-        // Build table with checkbox column (A coluna "Ações" foi removida conforme solicitado)
-        let html = '<table><thead><tr>' +
+        let html = '<div class="table-wrapper"><table><thead><tr>' +
             '<th style="width:36px;"><input id="selectAllCheckbox" type="checkbox" onchange="toggleSelectAll(this)"></th>' +
             '<th>Título</th><th>Data</th><th>Responsável</th><th>Empresa</th>' +
             '<th>Status</th><th>Prioridade</th><th>Tempo Em andamento</th></tr></thead><tbody>';
@@ -2062,7 +2207,6 @@
         visible.forEach(t => {
             const statusClass = 'tag-' + (t.status || '').replace(/\s+/g, '-');
             const priorityClass = 'tag-' + (t.priority || '');
-
             const checked = selectedTaskIds.has(t.id) ? 'checked' : '';
 
             html += `<tr>
@@ -2077,20 +2221,17 @@
             </tr>`;
         });
 
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
         container.innerHTML = html;
 
-        // show/hide delete selected button depending on selection
         const delBtn = document.getElementById('deleteSelectedBtn');
-        if (delBtn) delBtn.style.display = (selectedTaskIds.size > 0 && currentUser.role === 'Gestor') ? 'inline-block' : (currentUser.role === 'Gestor' ? 'inline-block' : 'none');
+        if (delBtn) delBtn.style.display = (selectedTaskIds.size > 0 && currentUser.role === 'Gestor') ? 'inline-block' : 'inline-block';
 
-        // update selectAll checkbox state
         const selectAll = document.getElementById('selectAllCheckbox');
         if (selectAll) {
             const allIds = visible.map(v => v.id);
             const allSelected = allIds.length > 0 && allIds.every(id => selectedTaskIds.has(id));
             selectAll.checked = allSelected;
-            // if some selected but not all -> set indeterminate
             selectAll.indeterminate = selectedTaskIds.size > 0 && !allSelected;
         }
     }
@@ -2123,14 +2264,12 @@
             return;
         }
 
-        // Collect selected tasks
         const selected = tasks.filter(t => selectedTaskIds.has(t.id));
         if (!selected.length) {
             alert('Nenhuma tarefa válida selecionada.');
             return;
         }
 
-        // Check if any selected tasks are recurring
         const recurringSelected = selected.filter(t => t.recurrence && t.recurrence !== 'Nenhuma');
 
         if (recurringSelected.length) {
@@ -2141,49 +2280,44 @@
             if (choice === null) return;
 
             if (choice === 'all') {
-                // Gather all ids to delete: for each recurringSelected, delete its whole series
                 const toDeleteIds = new Set();
                 recurringSelected.forEach(t => {
                     const series = getSeriesTasks(t);
                     series.forEach(s => toDeleteIds.add(s.id));
                 });
-                // Also include non-recurring selected tasks
-                selected.filter(t => ! (t.recurrence && t.recurrence !== 'Nenhuma')).forEach(t => toDeleteIds.add(t.id));
+                selected.filter(t => !(t.recurrence && t.recurrence !== 'Nenhuma')).forEach(t => toDeleteIds.add(t.id));
 
                 if (!confirm(`Confirma excluir ${toDeleteIds.size} tarefas (inclui todas as ocorrências das séries)?`)) return;
 
-                // Delete
                 toDeleteIds.forEach(id => {
                     tasks = tasks.filter(x => x.id !== id);
-                    try { db.collection('tasks').doc(id).delete(); } catch (e) { /* ignore */ }
+                    try { db.collection('tasks').doc(id).delete(); } catch (e) {}
                     selectedTaskIds.delete(id);
                 });
 
             } else {
-                // choice === 'this' -> delete only selected occurrences (no series deletion)
                 if (!confirm(`Confirma excluir ${selected.length} tarefas selecionadas?`)) return;
                 selected.forEach(t => {
                     tasks = tasks.filter(x => x.id !== t.id);
-                    try { db.collection('tasks').doc(t.id).delete(); } catch (e) { /* ignore */ }
+                    try { db.collection('tasks').doc(t.id).delete(); } catch (e) {}
                     selectedTaskIds.delete(t.id);
                 });
             }
         } else {
-            // No recurring tasks — delete selected directly
             if (!confirm(`Confirma excluir ${selected.length} tarefas selecionadas?`)) return;
             selected.forEach(t => {
                 tasks = tasks.filter(x => x.id !== t.id);
-                try { db.collection('tasks').doc(t.id).delete(); } catch (e) { /* ignore */ }
+                try { db.collection('tasks').doc(t.id).delete(); } catch (e) {}
                 selectedTaskIds.delete(t.id);
             });
         }
 
-        // refresh UI
         renderTasksTable();
         renderTasksOverview();
         renderCalendar();
         renderInProgressTasks();
         if (selectedDate) renderDayTasks(selectedDate);
+        showCopyToast('Tarefas excluídas.');
     }
 
     function renderTaskFilterOptions() {
@@ -2229,59 +2363,12 @@
         }
     }
 
-    function updateTaskStatus(id, newStatus) {
-        const t = tasks.find(t => t.id === id);
-        if (!t) return;
-
-        // Permissão: Gestor pode alterar qualquer um; Operador só altera se for responsável
-        if (!currentUser) {
-            alert('Faça login para alterar o status.');
-            closeStatusDropdown();
-            renderDayTasks(selectedDate);
-            return;
-        }
-        if (currentUser.role !== 'Gestor' && currentUser.username !== t.responsible) {
-            alert('Você não tem permissão para alterar o status desta tarefa.');
-            closeStatusDropdown();
-            renderDayTasks(selectedDate);
-            return;
-        }
-
-        applyStatusChange(t, newStatus);
-        try { db.collection('tasks').doc(t.id).set(t); } catch (e) { /* ignore */ }
-
-        closeStatusDropdown();
-
-        renderTasksOverview();
-        renderCalendar();
-        renderInProgressTasks();
-        if (selectedDate) renderDayTasks(selectedDate);
-        renderTasksTable();
-    }
-
-    function updateTaskPriority(id, newPriority) {
-        const t = tasks.find(t => t.id === id);
-        if (!t) return;
-        t.priority = newPriority;
-        try { db.collection('tasks').doc(t.id).set(t); } catch (e) { /* ignore */ }
-        renderTasksOverview();
-        renderCalendar();
-        renderInProgressTasks();
-        if (selectedDate) renderDayTasks(selectedDate);
-        renderTasksTable();
-    }
-
-    // ==========================
-    // deleteTask (ao excluir da tabela) também usa modal para recorrência
-    // ==========================
     async function deleteTask(id) {
         if (!currentUser || currentUser.role !== 'Gestor') {
             alert('Somente Gestores podem excluir tarefas.');
             return;
         }
         const t = tasks.find(t => t.id === id);
-        if (t) applyStatusChange(t, 'Pendente');
-
         if (!t) return;
 
         if (t.recurrence && t.recurrence !== 'Nenhuma') {
@@ -2297,19 +2384,19 @@
                 if (!confirm(`Confirma excluir ${series.length} tarefas recorrentes?`)) return;
                 series.forEach(item => {
                     tasks = tasks.filter(x => x.id !== item.id);
-                    try { db.collection('tasks').doc(item.id).delete(); } catch (e) { /* ignore */ }
+                    try { db.collection('tasks').doc(item.id).delete(); } catch (e) {}
                     selectedTaskIds.delete(item.id);
                 });
             } else {
                 if (!confirm('Deseja realmente excluir esta tarefa?')) return;
                 tasks = tasks.filter(x => x.id !== t.id);
-                try { db.collection('tasks').doc(t.id).delete(); } catch (e) { /* ignore */ }
+                try { db.collection('tasks').doc(t.id).delete(); } catch (e) {}
                 selectedTaskIds.delete(t.id);
             }
         } else {
             if (!confirm('Deseja realmente excluir esta tarefa?')) return;
             tasks = tasks.filter(x => x.id !== t.id);
-            try { db.collection('tasks').doc(t.id).delete(); } catch (e) { /* ignore */ }
+            try { db.collection('tasks').doc(t.id).delete(); } catch (e) {}
             selectedTaskIds.delete(t.id);
         }
 
@@ -2318,6 +2405,7 @@
         renderCalendar();
         renderInProgressTasks();
         if (selectedDate) renderDayTasks(selectedDate);
+        showCopyToast('Tarefa excluída.');
     }
 
     function renderTasksOverview() {
@@ -2325,13 +2413,12 @@
         if (!container) return;
 
         const visible = sortTasks(getVisibleTasks());
-
         if (!visible.length) {
             container.innerHTML = '<p class="small-text">Nenhuma tarefa cadastrada.</p>';
             return;
         }
 
-        let html = '<table><thead><tr><th>Data</th><th>Título</th><th>Resp.</th>' +
+        let html = '<div class="table-wrapper"><table><thead><tr><th>Data</th><th>Título</th><th>Resp.</th>' +
             '<th>Empresa</th><th>Status</th><th>Prioridade</th></tr></thead><tbody>';
 
         visible.forEach(t => {
@@ -2347,7 +2434,7 @@
             </tr>`;
         });
 
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
         container.innerHTML = html;
     }
 
@@ -2364,7 +2451,7 @@
             return;
         }
 
-        let html = '<table><thead><tr>' +
+        let html = '<div class="table-wrapper"><table><thead><tr>' +
             '<th>Título</th><th>Data</th><th>Responsável</th><th>Empresa</th><th>Status</th><th>Prioridade</th>' +
             '</tr></thead><tbody>';
 
@@ -2382,11 +2469,11 @@
             </tr>`;
         });
 
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
         container.innerHTML = html;
     }
 
-    // ========================== CALENDÁRIO ==========================
+    // ========================== CALENDÁRIO / TAREFAS DO DIA ==========================
     function renderCalendar() {
         const calendarDiv = document.getElementById('calendar');
         const monthLabel = document.getElementById('monthLabel');
@@ -2459,7 +2546,7 @@
         if (isToday) classes.push('today');
         if (isSelected) classes.push('selected');
 
-        let html = `<td class="${classes.join(' ')}" onclick="selectDate('${dateStr}')">`;
+        let html = `<td class="${classes.join(' ')}" onclick="selectDate('${dateStr}')" aria-label="Dia ${day}">`;
         html += day;
         if (hasTasks) html += '<div class="dot"></div>';
         html += '</td>';
@@ -2499,9 +2586,6 @@
         if (selectedDate) renderDayTasks(selectedDate);
     }
 
-    // ==========================
-    // Helper: mapeia status para classes / cores (mantém as cores originais)
-    // ==========================
     const STATUS_META = {
         'Aberto': { cls: 'tag-Aberto', bg: '#17a2b8', color: '#fff' },
         'Em andamento': { cls: 'tag-Em-andamento', bg: '#6f42c1', color: '#fff' },
@@ -2509,15 +2593,11 @@
         'Pendente': { cls: 'tag-Pendente', bg: '#fd7e14', color: '#000' }
     };
 
-    // ==========================
-    // Dropdown menu: abre ao clicar na tag (apenas 1 clique) — agora com toggle ao clicar novamente
-    // ==========================
     function closeStatusDropdown() {
         if (__openStatusDropdown) {
             __openStatusDropdown.remove();
             __openStatusDropdown = null;
         }
-        // reset anchor ref as well
         __openStatusDropdownAnchor = null;
 
         if (__outsideClickHandler) {
@@ -2531,13 +2611,11 @@
     }
 
     function openStatusDropdown(taskId, anchorEl) {
-        // If the same anchor was clicked and a dropdown is open, toggle/close it
         if (__openStatusDropdown && __openStatusDropdownAnchor === anchorEl) {
             closeStatusDropdown();
             return;
         }
 
-        // fecha qualquer dropdown aberto antes de abrir um novo (se for outro anchor)
         closeStatusDropdown();
 
         const task = tasks.find(t => t.id === taskId);
@@ -2561,7 +2639,6 @@
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.innerText = s;
-            // color the option to match status color (small square + bold text)
             const meta = STATUS_META[s] || { bg: '#fff', color: '#000' };
             btn.style.display = 'flex';
             btn.style.alignItems = 'center';
@@ -2585,25 +2662,19 @@
 
         document.body.appendChild(dropdown);
         __openStatusDropdown = dropdown;
-        // Remember which anchor opened this dropdown (for toggle behavior)
         __openStatusDropdownAnchor = anchorEl;
 
-        // Positioning: below the anchorEl if possible; otherwise adjust to fit viewport
         const rect = anchorEl.getBoundingClientRect();
         const ddRect = dropdown.getBoundingClientRect();
         const margin = 8;
 
-        // initial top/left
         let top = rect.bottom + margin;
         let left = rect.left;
 
-        // If dropdown would overflow right, adjust
         if (left + ddRect.width > window.innerWidth - 8) {
             left = Math.max(8, window.innerWidth - ddRect.width - 8);
         }
 
-        // If dropdown would overflow bottom, try place above anchor
-        // recalc ddRect after appended (height known)
         const ddHeight = dropdown.getBoundingClientRect().height;
         if (top + ddHeight > window.innerHeight - 8) {
             top = rect.top - ddHeight - margin;
@@ -2613,7 +2684,6 @@
         dropdown.style.left = left + 'px';
         dropdown.style.top = top + 'px';
 
-        // close when clicking outside
         __outsideClickHandler = function (e) {
             if (!dropdown.contains(e.target) && !anchorEl.contains(e.target)) {
                 closeStatusDropdown();
@@ -2621,16 +2691,42 @@
         };
         document.addEventListener('click', __outsideClickHandler);
 
-        // close on escape
         __escapeHandler = function (e) {
             if (e.key === 'Escape') closeStatusDropdown();
         };
         document.addEventListener('keydown', __escapeHandler);
     }
 
-    // ==========================
-    // FILTRO DE RESPONSÁVEIS NAS TAREFAS DO DIA (apenas Gestor)
-    // ==========================
+    function updateTaskStatus(id, newStatus) {
+        const t = tasks.find(t => t.id === id);
+        if (!t) return;
+
+        if (!currentUser) {
+            alert('Faça login para alterar o status.');
+            closeStatusDropdown();
+            if (selectedDate) renderDayTasks(selectedDate);
+            return;
+        }
+        if (currentUser.role !== 'Gestor' && currentUser.username !== t.responsible) {
+            alert('Você não tem permissão para alterar o status desta tarefa.');
+            closeStatusDropdown();
+            if (selectedDate) renderDayTasks(selectedDate);
+            return;
+        }
+
+        applyStatusChange(t, newStatus);
+        try { db.collection('tasks').doc(t.id).set(t); } catch (e) {}
+
+        closeStatusDropdown();
+
+        renderTasksOverview();
+        renderCalendar();
+        renderInProgressTasks();
+        if (selectedDate) renderDayTasks(selectedDate);
+        renderTasksTable();
+        showCopyToast('Status da tarefa atualizado.');
+    }
+
     function renderDayTasksResponsibleFilter() {
         const container = document.getElementById('dayTasksFilterContainer');
         const select = document.getElementById('dayTasksResponsibleFilter');
@@ -2667,9 +2763,6 @@
         if (selectedDate) renderDayTasks(selectedDate);
     }
 
-    // ==========================
-    // RENDER DAY TASKS MODIFIED
-    // ==========================
     function renderDayTasks(dateStr) {
         const container = document.getElementById('dayTasksList');
         const title = document.getElementById('dayTasksTitle');
@@ -2739,7 +2832,7 @@
         const statusArrow   = (dayTasksSortField === 'status')      ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
         const priorityArrow = (dayTasksSortField === 'priority')    ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
 
-        let html = '<table><thead><tr>' +
+        let html = '<div class="table-wrapper"><table><thead><tr>' +
             '<th onclick="setDayTasksSort(\'title\')">Título' + titleArrow + '</th>' +
             '<th onclick="setDayTasksSort(\'responsible\')">Resp.' + respArrow + '</th>' +
             '<th onclick="setDayTasksSort(\'company\')">Empresa' + companyArrow + '</th>' +
@@ -2756,7 +2849,6 @@
                 <td>${t.responsible}</td>
                 <td>${getCompanyNameById(t.companyId)}</td>
                 <td data-taskid="${t.id}" class="status-cell">` +
-                    // mostra a tag colorida (clicável) — o onclick chama openStatusDropdown
                     `<span class="tag ${statusClass}" ` +
                     `onclick="(function(e){ e.stopPropagation(); const el = e.currentTarget; openStatusDropdown('${t.id}', el); })(event)">${t.status}</span>` +
                 `</td>
@@ -2764,7 +2856,7 @@
             </tr>`;
         });
 
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
         container.innerHTML = html;
     }
 
@@ -2784,10 +2876,8 @@
         document.getElementById('taskRecurrence').value = t.recurrence || 'Nenhuma';
 
         document.getElementById('taskSubmitBtn').textContent = 'Atualizar tarefa';
-
         document.getElementById('taskDeleteBtn').style.display =
             (currentUser && currentUser.role === 'Gestor') ? 'inline-block' : 'none';
-
         document.getElementById('taskCancelBtn').style.display = 'inline-block';
     }
 
@@ -2851,8 +2941,9 @@
                 p.username = username;
                 p.password = pass;
                 p.observation = observation;
-                try { db.collection('passwords').doc(p.id).set(p); } catch (e) { /* ignore */ }
+                try { db.collection('passwords').doc(p.id).set(p); } catch (e) {}
             }
+            showCopyToast('Senha atualizada com sucesso!');
         } else {
             const newPassword = {
                 id: generateId(),
@@ -2864,7 +2955,8 @@
                 observation
             };
             passwords.push(newPassword);
-            try { db.collection('passwords').doc(newPassword.id).set(newPassword); } catch (e) { /* ignore */ }
+            try { db.collection('passwords').doc(newPassword.id).set(newPassword); } catch (e) {}
+            showCopyToast('Senha salva com sucesso!');
         }
 
         resetPasswordForm();
@@ -2875,7 +2967,6 @@
         const selectForm = document.getElementById('passwordCompanySelect');
         const selectFilter = document.getElementById('passwordCompanyFilter');
 
-        // Select do formulário
         if (selectForm) {
             selectForm.innerHTML = '';
 
@@ -2906,7 +2997,6 @@
             }
         }
 
-        // Select de filtro
         if (selectFilter) {
             const current = selectFilter.value || '';
             selectFilter.innerHTML = '';
@@ -3017,7 +3107,7 @@
 
         const isGestor = currentUser && currentUser.role === 'Gestor';
 
-        let html = '<table><thead><tr>' +
+        let html = '<div class="table-wrapper"><table><thead><tr>' +
             '<th>Empresa</th><th>Nome</th><th>Site</th><th>Usuário</th><th>Senha</th><th>Observação</th>';
         if (isGestor) html += '<th>Ações</th>';
         html += '</tr></thead><tbody>';
@@ -3025,7 +3115,7 @@
         list.forEach(p => {
             const companyName = getCompanyNameById(p.companyId);
             const siteLink = p.site
-                ? `<a href="${p.site}" target="_blank">${p.site}</a>`
+                ? `<a href="${p.site}" target="_blank" rel="noopener noreferrer">${p.site}</a>`
                 : '-';
 
             const encodedUser = encodeURIComponent(p.username || '');
@@ -3047,7 +3137,7 @@
             html += '</tr>';
         });
 
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
         container.innerHTML = html;
     }
 
@@ -3082,27 +3172,14 @@
         if (!confirm('Deseja realmente excluir esta senha?')) return;
 
         passwords = passwords.filter(p => p.id !== id);
-        try { db.collection('passwords').doc(id).delete(); } catch (e) { /* ignore */ }
+        try { db.collection('passwords').doc(id).delete(); } catch (e) {}
         renderPasswordsTable();
+        showCopyToast('Senha excluída.');
     }
 
     // ========================== INICIALIZAÇÃO ==========================
-    document.addEventListener('DOMContentLoaded', async function () {
-        await loadData();
-        ensureDefaultAdmin();
-
-        const savedUser = localStorage.getItem('miniERP_currentUser');
-        if (savedUser) {
-            try {
-                currentUser = JSON.parse(savedUser);
-                applyAutoCarryOver();
-                showApp();
-            } catch (e) {
-                console.error('Erro ao restaurar sessão:', e);
-            }
-        } else {
-            showLogin();
-        }
+    document.addEventListener('DOMContentLoaded', function () {
+        // Não chamamos loadData aqui para evitar leituras antes do login
 
         document.getElementById('loginForm').addEventListener('submit', handleLogin);
         document.getElementById('userForm').addEventListener('submit', handleUserForm);
@@ -3125,11 +3202,20 @@
         const recurrenceSelect = document.getElementById('taskRecurrence');
         if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
 
+        renderCompanyOperatorSelect();
         renderPasswordCompanySelect();
         renderCompaniesTable();
         renderUsersTable();
         renderTaskFilterOptions();
         renderDayTasksResponsibleFilter();
+        renderCalendar();
+
+        // Define o filtro inicial de tarefas para 1 semana a partir de hoje
+        setDefaultTaskWeekFilter(true);
+        renderTasksTable();
+
+        // Listener de sessão segura (Firebase Auth cuida do remember-me)
+        auth.onAuthStateChanged(onAuthUserLoggedIn);
     });
 </script>
 
