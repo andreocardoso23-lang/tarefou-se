@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Tarefou-se!</title>
+    <title>Tarefou-se! (Segura)</title>
 
     <!-- Firebase (versão compat para uso simples em HTML) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -642,17 +642,17 @@
                     <div class="card">
                         <div class="flex-row" style="align-items:center; justify-content:space-between; gap:8px;">
                             <h2 id="dayTasksTitle" style="margin-bottom:0;">Tarefas do dia</h2>
-                            <div id="dayTasksFilterContainer" class="small-text" style="display:none;">
-                                <label for="dayTasksResponsibleFilter" style="margin-right:4px;">Responsável:</label>
-                                <select id="dayTasksResponsibleFilter" onchange="setDayTasksResponsibleFilter(this.value)">
-                                    <option value="">Todos</option>
-                                </select>
-                            </div>
-                            <div class="small-text">
-                                <label for="dayTasksShowCompletedCheckbox" style="display:flex; align-items:center; gap:4px;">
-                                    <input type="checkbox" id="dayTasksShowCompletedCheckbox" onchange="setDayTasksShowCompleted(this.checked)">
-                                    Mostrar concluídas
-                                </label>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div id="dayTasksFilterContainer" class="small-text" style="display:none; margin-right:8px;">
+                                    <label for="dayTasksResponsibleFilter" style="margin-right:4px;">Responsável:</label>
+                                    <select id="dayTasksResponsibleFilter" onchange="setDayTasksResponsibleFilter(this.value)">
+                                        <option value="">Todos</option>
+                                    </select>
+                                </div>
+                                <div class="small-text" style="display:flex; align-items:center;">
+                                    <input type="checkbox" id="dayTasksShowCompleted" style="margin-right:4px;">
+                                    <label for="dayTasksShowCompleted">Mostrar concluídas</label>
+                                </div>
                             </div>
                         </div>
                         <div id="dayTasksList" class="small-text" style="margin-top:8px;">
@@ -786,7 +786,7 @@
                 <h2>Senhas por empresa</h2>
                 <p class="small-text">
                     Gestores podem cadastrar/alterar senhas. Operadores possuem apenas visualização.<br>
-
+                    
                 </p>
                 <form id="passwordForm">
                     <div class="flex-row">
@@ -950,7 +950,6 @@
     let dayTasksSortField = null;
     let dayTasksSortDirection = 'asc';
     let dayTasksFilterResponsible = '';
-    let dayTasksShowCompleted = false;
 
     const selectedTaskIds = new Set();
 
@@ -2266,45 +2265,42 @@
             alert('Somente Gestores podem excluir tarefas.');
             return;
         }
-
-        if (selectedTaskIds.size === 0) {
+        if (!selectedTaskIds.size) {
             alert('Nenhuma tarefa selecionada.');
             return;
         }
 
-        const selected = getFilteredTasksList().filter(t => selectedTaskIds.has(t.id));
+        const selected = tasks.filter(t => selectedTaskIds.has(t.id));
         if (!selected.length) {
-            alert('Nenhuma tarefa selecionada no filtro atual.');
+            alert('Nenhuma tarefa válida selecionada.');
             return;
         }
 
-        const hasRecurrence = selected.some(t => t.recurrence && t.recurrence !== 'Nenhuma');
-        if (hasRecurrence) {
-            const choice = await showRecurrenceModal(
-                'Há tarefas recorrentes na seleção.\n\nEscolha "Todas as tarefas" para excluir TODAS as ocorrências recorrentes de cada série selecionada ou "Apenas esta tarefa" para excluir apenas as tarefas selecionadas neste período.',
-                'Excluir tarefas selecionadas (recorrentes)'
-            );
+        const recurringSelected = selected.filter(t => t.recurrence && t.recurrence !== 'Nenhuma');
 
+        if (recurringSelected.length) {
+            const choice = await showRecurrenceModal(
+                `Existem ${recurringSelected.length} tarefa(s) recorrente(s) selecionada(s). Deseja excluir todas as ocorrências das séries ou apenas as ocorrências selecionadas?`,
+                'Excluir tarefas recorrentes'
+            );
             if (choice === null) return;
 
             if (choice === 'all') {
-                const toDeleteSet = new Set();
-                selected.forEach(t => {
-                    if (t.recurrence && t.recurrence !== 'Nenhuma') {
-                        const series = getSeriesTasks(t);
-                        series.forEach(item => toDeleteSet.add(item.id));
-                    } else {
-                        toDeleteSet.add(t.id);
-                    }
+                const toDeleteIds = new Set();
+                recurringSelected.forEach(t => {
+                    const series = getSeriesTasks(t);
+                    series.forEach(s => toDeleteIds.add(s.id));
                 });
+                selected.filter(t => !(t.recurrence && t.recurrence !== 'Nenhuma')).forEach(t => toDeleteIds.add(t.id));
 
-                if (!confirm(`Confirma excluir ${toDeleteSet.size} tarefas (incluindo recorrentes)?`)) return;
+                if (!confirm(`Confirma excluir ${toDeleteIds.size} tarefas (inclui todas as ocorrências das séries)?`)) return;
 
-                tasks = tasks.filter(x => !toDeleteSet.has(x.id));
-                toDeleteSet.forEach(id => {
+                toDeleteIds.forEach(id => {
+                    tasks = tasks.filter(x => x.id !== id);
                     try { db.collection('tasks').doc(id).delete(); } catch (e) {}
                     selectedTaskIds.delete(id);
                 });
+
             } else {
                 if (!confirm(`Confirma excluir ${selected.length} tarefas selecionadas?`)) return;
                 selected.forEach(t => {
@@ -2773,11 +2769,6 @@
         if (selectedDate) renderDayTasks(selectedDate);
     }
 
-    function setDayTasksShowCompleted(checked) {
-        dayTasksShowCompleted = !!checked;
-        if (selectedDate) renderDayTasks(selectedDate);
-    }
-
     function renderDayTasks(dateStr) {
         const container = document.getElementById('dayTasksList');
         const title = document.getElementById('dayTasksTitle');
@@ -2786,7 +2777,11 @@
         let visible = getVisibleTasks().filter(t => {
             if (t.date !== dateStr) return false;
             if (dayTasksFilterResponsible && t.responsible !== dayTasksFilterResponsible) return false;
-            if (!dayTasksShowCompleted && t.status === 'Concluído') return false;
+
+            const showCompletedCheckbox = document.getElementById('dayTasksShowCompleted');
+            const showCompleted = showCompletedCheckbox && showCompletedCheckbox.checked;
+            if (!showCompleted && t.status === 'Concluído') return false;
+
             return true;
         });
 
@@ -2902,133 +2897,202 @@
         const form = document.getElementById('passwordForm');
         if (form) form.reset();
 
+        const companySelect = document.getElementById('passwordCompanySelect');
+        if (companySelect && companySelect.options.length > 0) {
+            companySelect.selectedIndex = 0;
+        }
+
         editingPasswordId = null;
-
-        const passwordCompanySelect = document.getElementById('passwordCompanySelect');
-        if (passwordCompanySelect) passwordCompanySelect.value = '';
-
-        document.getElementById('passwordSubmitBtn').textContent = 'Salvar senha';
-        document.getElementById('passwordDeleteBtn').style.display = 'none';
-        document.getElementById('passwordCancelBtn').style.display = 'none';
+        const submitBtn = document.getElementById('passwordSubmitBtn');
+        if (submitBtn) submitBtn.textContent = 'Salvar senha';
+        const cancelBtn = document.getElementById('passwordCancelBtn');
+        const deleteBtn = document.getElementById('passwordDeleteBtn');
+        if (cancelBtn) cancelBtn.style.display = 'none';
+        if (deleteBtn) deleteBtn.style.display = 'none';
     }
 
-    function renderPasswordCompanySelect() {
-        const select = document.getElementById('passwordCompanySelect');
-        const filter = document.getElementById('passwordCompanyFilter');
-        if (!select && !filter) return;
-
-        const sorted = companies.slice().sort((a, b) =>
-            (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' })
-        );
-
-        if (select) {
-            select.innerHTML = '';
-            const optPlaceholder = document.createElement('option');
-            optPlaceholder.value = '';
-            optPlaceholder.textContent = 'Selecione a empresa';
-            optPlaceholder.disabled = true;
-            optPlaceholder.selected = true;
-            select.appendChild(optPlaceholder);
-
-            sorted.forEach(c => {
-                const opt = document.createElement('option');
-                opt.value = c.id;
-                opt.textContent = c.name;
-                select.appendChild(opt);
-            });
-        }
-
-        if (filter) {
-            const currentVal = filter.value || '';
-            filter.innerHTML = '';
-            const optAll = document.createElement('option');
-            optAll.value = '';
-            optAll.textContent = 'Todas';
-            filter.appendChild(optAll);
-
-            sorted.forEach(c => {
-                const opt = document.createElement('option');
-                opt.value = c.id;
-                opt.textContent = c.name;
-                filter.appendChild(opt);
-            });
-
-            filter.value = currentVal;
-        }
+    function cancelPasswordEdit() {
+        resetPasswordForm();
     }
 
-    async function handlePasswordForm(event) {
+    function deleteCurrentEditingPassword() {
+        if (!editingPasswordId) return;
+        deletePassword(editingPasswordId);
+        resetPasswordForm();
+    }
+
+    function handlePasswordForm(event) {
         event.preventDefault();
+
         if (!currentUser || currentUser.role !== 'Gestor') {
-            alert('Somente Gestores podem cadastrar/alterar senhas.');
+            alert('Apenas Gestores podem gerenciar senhas.');
             return;
         }
 
         const companyId = document.getElementById('passwordCompanySelect').value;
         const name = document.getElementById('passwordName').value.trim();
         const site = document.getElementById('passwordSite').value.trim();
-        const user = document.getElementById('passwordUser').value.trim();
+        const username = document.getElementById('passwordUser').value.trim();
         const pass = document.getElementById('passwordPass').value.trim();
-        const obs = document.getElementById('passwordObservation').value.trim();
-        const submitBtn = document.getElementById('passwordSubmitBtn');
+        const observation = document.getElementById('passwordObservation').value.trim();
 
-        if (!companyId || !name || !user || !pass) {
+        if (!companyId || !name || !username || !pass) {
             alert('Preencha os campos obrigatórios (empresa, nome, usuário e senha).');
             return;
         }
 
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Salvando...';
-
-        try {
-            if (editingPasswordId) {
-                const p = passwords.find(p => p.id === editingPasswordId);
-                if (p) {
-                    p.companyId = companyId;
-                    p.name = name;
-                    p.site = site;
-                    p.user = user;
-                    p.pass = pass;
-                    p.obs = obs;
-                    await db.collection('passwords').doc(p.id).set(p);
-                }
+        if (editingPasswordId) {
+            const p = passwords.find(p => p.id === editingPasswordId);
+            if (!p) {
+                alert('Registro de senha não encontrado para edição.');
             } else {
-                const newPass = {
-                    id: generateId(),
-                    companyId,
-                    name,
-                    site,
-                    user,
-                    pass,
-                    obs
-                };
-                passwords.push(newPass);
-                await db.collection('passwords').doc(newPass.id).set(newPass);
+                p.companyId = companyId;
+                p.name = name;
+                p.site = site;
+                p.username = username;
+                p.password = pass;
+                p.observation = observation;
+                try { db.collection('passwords').doc(p.id).set(p); } catch (e) {}
             }
-
-            resetPasswordForm();
-            renderPasswordsTable();
+            showCopyToast('Senha atualizada com sucesso!');
+        } else {
+            const newPassword = {
+                id: generateId(),
+                companyId,
+                name,
+                site,
+                username,
+                password: pass,
+                observation
+            };
+            passwords.push(newPassword);
+            try { db.collection('passwords').doc(newPassword.id).set(newPassword); } catch (e) {}
             showCopyToast('Senha salva com sucesso!');
-        } catch (e) {
-            console.error('Erro ao salvar senha:', e);
-            alert('Erro ao salvar senha. Verifique as regras do Firestore.');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Salvar senha';
         }
+
+        resetPasswordForm();
+        renderPasswordsTable();
+    }
+
+    function renderPasswordCompanySelect() {
+        const selectForm = document.getElementById('passwordCompanySelect');
+        const selectFilter = document.getElementById('passwordCompanyFilter');
+
+        if (selectForm) {
+            selectForm.innerHTML = '';
+
+            if (!companies.length) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Cadastre empresas primeiro';
+                opt.disabled = true;
+                opt.selected = true;
+                selectForm.appendChild(opt);
+                selectForm.disabled = true;
+            } else {
+                selectForm.disabled = false;
+
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = 'Selecione a empresa';
+                placeholder.disabled = true;
+                placeholder.selected = true;
+                selectForm.appendChild(placeholder);
+
+                companies.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name;
+                    selectForm.appendChild(opt);
+                });
+            }
+        }
+
+        if (selectFilter) {
+            const current = selectFilter.value || '';
+            selectFilter.innerHTML = '';
+
+            const optAll = document.createElement('option');
+            optAll.value = '';
+            optAll.textContent = 'Todas';
+            selectFilter.appendChild(optAll);
+
+            companies.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                selectFilter.appendChild(opt);
+            });
+
+            selectFilter.value = current;
+        }
+    }
+
+    function showCopyToast(message) {
+        const toast = document.getElementById('copyToast');
+        if (!toast) return;
+        toast.textContent = message || 'Copiado!';
+        toast.classList.add('show');
+        clearTimeout(window.__copyToastTimeout);
+        window.__copyToastTimeout = setTimeout(() => {
+            toast.classList.remove('show');
+        }, 1500);
+    }
+
+    function copyToClipboard(text) {
+        if (!text) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    showCopyToast('Copiado!');
+                })
+                .catch(() => {
+                    fallbackCopy(text);
+                });
+        } else {
+            fallbackCopy(text);
+        }
+    }
+
+    function fallbackCopy(text) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            showCopyToast('Copiado!');
+        } catch (e) {
+            console.error('Falha ao copiar texto:', e);
+        }
+        document.body.removeChild(textarea);
+    }
+
+    function handleCopyClick(el) {
+        const encoded = el.getAttribute('data-copy') || '';
+        const text = decodeURIComponent(encoded);
+        copyToClipboard(text);
     }
 
     function renderPasswordsTable() {
         const container = document.getElementById('passwordsTable');
         if (!container) return;
 
+        if (!currentUser) {
+            container.innerHTML = '<p class="small-text">Faça login para visualizar as senhas.</p>';
+            return;
+        }
+
         if (!passwords.length) {
             container.innerHTML = '<p class="small-text">Nenhuma senha cadastrada.</p>';
             return;
         }
 
-        const filterCompany = document.getElementById('passwordCompanyFilter');
-        const filterCompanyId = filterCompany ? (filterCompany.value || '') : '';
+        const filterSelect = document.getElementById('passwordCompanyFilter');
+        const filterCompanyId = filterSelect ? (filterSelect.value || '') : '';
 
         let list = passwords.slice();
         if (filterCompanyId) {
@@ -3036,27 +3100,27 @@
         }
 
         if (!list.length) {
-            container.innerHTML = '<p class="small-text">Nenhuma senha para o filtro selecionado.</p>';
+            container.innerHTML = '<p class="small-text">Nenhuma senha encontrada para o filtro selecionado.</p>';
             return;
         }
 
         list.sort((a, b) => {
-            const ca = (getCompanyNameById(a.companyId) || '').toUpperCase();
-            const cb = (getCompanyNameById(b.companyId) || '').toUpperCase();
-            if (ca < cb) return -1;
-            if (ca > cb) return 1;
-            const na = (a.name || '').toUpperCase();
-            const nb = (b.name || '').toUpperCase();
-            if (na < nb) return -1;
-            if (na > nb) return 1;
+            const compA = (getCompanyNameById(a.companyId) || '').toUpperCase();
+            const compB = (getCompanyNameById(b.companyId) || '').toUpperCase();
+            if (compA < compB) return -1;
+            if (compA > compB) return 1;
+            const nameA = (a.name || '').toUpperCase();
+            const nameB = (b.name || '').toUpperCase();
+            if (nameA < nameB) return -1;
+            if (nameA > nameB) return 1;
             return 0;
         });
 
-        const canEdit = currentUser && currentUser.role === 'Gestor';
+        const isGestor = currentUser && currentUser.role === 'Gestor';
 
         let html = '<div class="table-wrapper"><table><thead><tr>' +
-            '<th>Empresa</th><th>Nome</th><th>Site</th><th>Usuário</th><th>Senha</th><th>Obs.</th>';
-        if (canEdit) html += '<th>Ações</th>';
+            '<th>Empresa</th><th>Nome</th><th>Site</th><th>Usuário</th><th>Senha</th><th>Observação</th>';
+        if (isGestor) html += '<th>Ações</th>';
         html += '</tr></thead><tbody>';
 
         list.forEach(p => {
@@ -3065,21 +3129,22 @@
                 ? `<a href="${p.site}" target="_blank" rel="noopener noreferrer">${p.site}</a>`
                 : '-';
 
+            const encodedUser = encodeURIComponent(p.username || '');
+            const encodedPass = encodeURIComponent(p.password || '');
+
             html += `<tr>
                 <td>${companyName}</td>
                 <td>${p.name}</td>
                 <td>${siteLink}</td>
-                <td class="copyable" onclick="copyToClipboard('${(p.user || '').replace(/'/g, "\\'")}')">${p.user}</td>
-                <td class="copyable" onclick="copyToClipboard('${(p.pass || '').replace(/'/g, "\\'")}')">${p.pass}</td>
-                <td>${p.obs || ''}</td>`;
-
-            if (canEdit) {
+                <td><span class="copyable" data-copy="${encodedUser}" onclick="handleCopyClick(this)">${p.username}</span></td>
+                <td><span class="copyable" data-copy="${encodedPass}" onclick="handleCopyClick(this)">${p.password}</span></td>
+                <td>${p.observation || ''}</td>`;
+            if (isGestor) {
                 html += `<td class="actions">
                     <button onclick="editPassword('${p.id}')">Editar</button>
                     <button onclick="deletePassword('${p.id}')">Excluir</button>
                 </td>`;
             }
-
             html += '</tr>';
         });
 
@@ -3089,9 +3154,10 @@
 
     function editPassword(id) {
         if (!currentUser || currentUser.role !== 'Gestor') {
-            alert('Somente Gestores podem editar senhas.');
+            alert('Apenas Gestores podem editar senhas.');
             return;
         }
+
         const p = passwords.find(p => p.id === id);
         if (!p) return;
 
@@ -3100,82 +3166,80 @@
         document.getElementById('passwordCompanySelect').value = p.companyId;
         document.getElementById('passwordName').value = p.name || '';
         document.getElementById('passwordSite').value = p.site || '';
-        document.getElementById('passwordUser').value = p.user || '';
-        document.getElementById('passwordPass').value = p.pass || '';
-        document.getElementById('passwordObservation').value = p.obs || '';
+        document.getElementById('passwordUser').value = p.username || '';
+        document.getElementById('passwordPass').value = p.password || '';
+        document.getElementById('passwordObservation').value = p.observation || '';
 
         document.getElementById('passwordSubmitBtn').textContent = 'Atualizar senha';
-        document.getElementById('passwordDeleteBtn').style.display = 'inline-block';
         document.getElementById('passwordCancelBtn').style.display = 'inline-block';
+        document.getElementById('passwordDeleteBtn').style.display = 'inline-block';
     }
 
-    async function deletePassword(id) {
+    function deletePassword(id) {
         if (!currentUser || currentUser.role !== 'Gestor') {
-            alert('Somente Gestores podem excluir senhas.');
+            alert('Apenas Gestores podem excluir senhas.');
             return;
         }
-        const p = passwords.find(p => p.id === id);
-        if (!p) return;
-
         if (!confirm('Deseja realmente excluir esta senha?')) return;
 
-        try {
-            await db.collection('passwords').doc(id).delete();
-            passwords = passwords.filter(ps => ps.id !== id);
-            renderPasswordsTable();
-            showCopyToast('Senha excluída.');
-        } catch (e) {
-            console.error('Erro ao excluir senha:', e);
-            alert('Erro ao excluir senha. Verifique as regras do Firestore.');
-        }
+        passwords = passwords.filter(p => p.id !== id);
+        try { db.collection('passwords').doc(id).delete(); } catch (e) {}
+        renderPasswordsTable();
+        showCopyToast('Senha excluída.');
     }
 
-    // ========================== COPIAR / TOAST ==========================
-    function copyToClipboard(text) {
-        if (!navigator.clipboard) {
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                showCopyToast('Copiado!');
-            } catch (e) {
-                console.error('Falha ao copiar:', e);
-            }
-            document.body.removeChild(textarea);
-            return;
+    // ========================== INICIALIZAÇÃO ==========================
+    document.addEventListener('DOMContentLoaded', function () {
+        // Não chamamos loadData aqui para evitar leituras antes do login
+
+        document.getElementById('loginForm').addEventListener('submit', handleLogin);
+        document.getElementById('userForm').addEventListener('submit', handleUserForm);
+        document.getElementById('companyForm').addEventListener('submit', handleCompanyForm);
+        document.getElementById('taskForm').addEventListener('submit', handleTaskForm);
+
+        const passwordForm = document.getElementById('passwordForm');
+        if (passwordForm) {
+            passwordForm.addEventListener('submit', handlePasswordForm);
         }
 
-        navigator.clipboard.writeText(text)
-            .then(() => showCopyToast('Copiado!'))
-            .catch(err => console.error('Erro ao copiar texto:', err));
-    }
+        const taskDateInput = document.getElementById('taskDate');
+        function fillTodayIfEmpty() {
+            if (!taskDateInput.value) taskDateInput.value = getTodayStr();
+        }
+        taskDateInput.addEventListener('focus', fillTodayIfEmpty);
+        taskDateInput.addEventListener('click', fillTodayIfEmpty);
+        taskDateInput.value = getTodayStr();
 
-    function showCopyToast(message) {
-        const toast = document.getElementById('copyToast');
-        if (!toast) return;
-        toast.innerText = message || 'Copiado!';
-        toast.classList.add('show');
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 1500);
-    }
+        const recurrenceSelect = document.getElementById('taskRecurrence');
+        if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
 
-    // ========================== EVENTOS INICIAIS ==========================
-    document.getElementById('loginForm').addEventListener('submit', handleLogin);
-    document.getElementById('taskForm').addEventListener('submit', handleTaskForm);
-    document.getElementById('companyForm').addEventListener('submit', handleCompanyForm);
-    document.getElementById('userForm').addEventListener('submit', handleUserForm);
-    document.getElementById('passwordForm').addEventListener('submit', handlePasswordForm);
+        renderCompanyOperatorSelect();
+        renderPasswordCompanySelect();
+        renderCompaniesTable();
+        renderUsersTable();
+        renderTaskFilterOptions();
+        renderDayTasksResponsibleFilter();
+        renderCalendar();
 
-    auth.onAuthStateChanged(onAuthUserLoggedIn);
+        // Atualiza lista de tarefas do dia ao marcar/desmarcar "Mostrar concluídas"
+        const dayTasksShowCompleted = document.getElementById('dayTasksShowCompleted');
+        if (dayTasksShowCompleted) {
+            dayTasksShowCompleted.addEventListener('change', function () {
+                if (selectedDate) {
+                    renderDayTasks(selectedDate);
+                }
+            });
+        }
 
-    // Exemplo: setDefaultTaskWeekFilter(true) ao carregar para aplicar intervalo padrão
-    window.addEventListener('load', () => {
+        // Define o filtro inicial de tarefas para 1 semana a partir de hoje
         setDefaultTaskWeekFilter(true);
+        renderTasksTable();
+
+        // Listener de sessão segura (Firebase Auth cuida do remember-me)
+        auth.onAuthStateChanged(onAuthUserLoggedIn);
     });
 </script>
 
 </body>
 </html>
+
