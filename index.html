@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Tarefou-se! (Segura)</title>
+    <title>Tarefou-se!</title>
 
     <!-- Firebase (versão compat para uso simples em HTML) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -413,6 +413,125 @@
             opacity: 1;
         }
 
+        /* MAPA / FLUXOGRAMA */
+        .map-toolbar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .map-canvas {
+            position: relative;
+            height: 520px;
+            border: 1px dashed #ccc;
+            border-radius: 6px;
+            background: #fafafa;
+            overflow: auto;
+            cursor: grab;
+        }
+
+        .map-canvas svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            transform-origin: 0 0;
+            overflow: visible;
+        }
+
+        .map-nodes-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform-origin: 0 0;
+        }
+
+        .map-node {
+            position: absolute;
+            min-width: 120px;
+            max-width: 260px;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: #fff;
+            border: 2px solid #4c6fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+            cursor: move;
+            user-select: none;
+            font-weight: 600;
+            color: #2d2d2d;
+            transition: transform 0.08s ease;
+            word-break: break-word;
+            white-space: normal;
+        }
+
+        .map-node.readonly {
+            cursor: default;
+            border-style: dashed;
+            background: #f7f7f7;
+        }
+
+        .map-node:active {
+            transform: scale(1.01);
+        }
+
+        .map-panel {
+            display: grid;
+            grid-template-columns: minmax(320px, 360px) 1fr;
+            gap: 12px;
+            align-items: start;
+        }
+
+        .map-panel.readonly {
+            grid-template-columns: 1fr;
+        }
+
+        .map-column {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .map-visual {
+            width: 100%;
+        }
+
+        .map-edge-list {
+            max-height: 120px;
+            overflow-y: auto;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+
+        @media (max-width: 900px) {
+            .map-panel {
+                grid-template-columns: 1fr;
+            }
+            .map-node {
+                min-width: 100px;
+                max-width: 220px;
+                padding: 8px 10px;
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .map-node {
+                min-width: 90px;
+                max-width: 200px;
+                padding: 6px 8px;
+                font-size: 12px;
+            }
+        }
+
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -538,6 +657,7 @@
             <a id="nav-dashboard" onclick="showSection('dashboardSection')" class="active">Dashboard</a>
             <a id="nav-companies" onclick="showSection('companiesSection')">Empresas</a>
             <a id="nav-tasks" onclick="showSection('tasksSection')">Tarefas</a>
+            <a id="nav-maps" onclick="showSection('mapsSection')">Mapa</a>
             <a id="nav-passwords" onclick="showSection('passwordsSection')">Senhas</a>
             <a id="nav-users" onclick="showSection('usersSection')">Usuários</a>
         </nav>
@@ -649,6 +769,12 @@
                                         <option value="">Todos</option>
                                     </select>
                                 </div>
+                                <div id="dayTasksCompanyFilterContainer" class="small-text" style="display:none; margin-right:8px;">
+                                    <label for="dayTasksCompanyFilter" style="margin-right:4px;">Empresa:</label>
+                                    <select id="dayTasksCompanyFilter" onchange="setDayTasksCompanyFilter(this.value)">
+                                        <option value="">Todas</option>
+                                    </select>
+                                </div>
                                 <div class="small-text" style="display:flex; align-items:center;">
                                     <input type="checkbox" id="dayTasksShowCompleted" style="margin-right:4px;">
                                     <label for="dayTasksShowCompleted">Mostrar concluídas</label>
@@ -674,7 +800,7 @@
                             <input type="text" id="companyName" required>
                         </div>
                         <div style="width:220px;">
-                            <label for="companyCNPJ">CNPJ</label>
+                            <label for="companyCNPJ">CNPJ/CPF</label>
                             <input type="text" id="companyCNPJ" placeholder="00.000.000/0000-00">
                         </div>
                     </div>
@@ -733,6 +859,13 @@
                         0
                     </span>
                 </h2>
+                <div class="small-text" style="margin-top:4px;">
+                    Ativos: Grupo 1 (Simples/Presumido/Real/MEI):
+                    <span id="companiesActiveGroup1Count">0</span>
+                    |
+                    Grupo 2 (Livro Caixa):
+                    <span id="companiesActiveGroup2Count">0</span>
+                </div>
                 <div id="companiesTable"></div>
             </div>
         </section>
@@ -780,6 +913,76 @@
             </div>
         </section>
 
+        <!-- MAPA -->
+        <section id="mapsSection" class="section">
+            <div class="card">
+                <h2>Mapa de processos</h2>
+                <p class="small-text">
+                    Apenas Gestores podem criar ou editar fluxogramas. Operadores podem apenas visualizar.
+                </p>
+                <div class="map-toolbar">
+                    <div style="min-width:240px;">
+                        <label for="mapSelect">Fluxograma</label>
+                        <select id="mapSelect" onchange="handleMapSelectChange()"></select>
+                    </div>
+                    <div class="map-edit-only" style="flex:1; min-width:260px;">
+                        <label for="mapNameInput">Nome do fluxograma</label>
+                        <input type="text" id="mapNameInput" placeholder="Nome do fluxograma">
+                    </div>
+                    <div class="map-edit-only" style="display:flex; gap:8px; align-items:flex-end;">
+                        <button type="button" onclick="createMap()">Criar</button>
+                        <button type="button" class="btn-secondary" onclick="renameCurrentMap()">Editar</button>
+                        <button type="button" class="btn-secondary" id="mapDeleteBtn" onclick="deleteCurrentMap()">Excluir</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Editor de fluxograma</h3>
+                <p class="small-text">Adicione nós, conecte-os e arraste para posicionar.</p>
+                <div class="map-panel">
+                    <div class="map-column map-edit-only">
+                        <div style="margin-bottom:12px;">
+                            <label for="mapNodeLabel">Nome do nó</label>
+                            <input type="text" id="mapNodeLabel" placeholder="Ex: Receber documentos">
+                            <div style="margin-top:8px;">
+                                <button type="button" onclick="saveMapNode()">Salvar</button>
+                                <button type="button" class="btn-secondary" onclick="resetMapNodeForm()">Limpar</button>
+                                <button type="button" class="btn-secondary" id="mapNodeDeleteBtn" style="display:none; margin-left:4px;" onclick="deleteCurrentMapNode()">Excluir nó</button>
+                            </div>
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label for="mapNodeSelect">Editar nome do nó</label>
+                            <div class="flex-row">
+                                <select id="mapNodeSelect"></select>
+                                <button type="button" onclick="loadNodeForEdit()">Editar</button>
+                            </div>
+                        </div>
+                        <div style="margin-top:8px;">
+                            <label>Conectar</label>
+                            <div class="flex-row">
+                                <select id="mapEdgeFrom"></select>
+                                <select id="mapEdgeTo"></select>
+                            </div>
+                            <div style="margin-top:8px;">
+                                <button type="button" onclick="saveMapEdge()">Adicionar ligação</button>
+                                <button type="button" class="btn-secondary" onclick="clearMapEdgeForm()">Limpar ligação</button>
+                            </div>
+                            <div class="map-edge-list" id="mapEdgesList"></div>
+                        </div>
+                    </div>
+                    <div class="map-visual">
+                        <label>Visualização</label>
+                        <div class="map-canvas" id="mapCanvas">
+                            <svg id="mapEdgesLayer"></svg>
+                            <div class="map-nodes-layer" id="mapNodesLayer"></div>
+                        </div>
+                        <div class="small-text" id="mapCanvasHint" style="margin-top:6px;"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- SENHAS -->
         <section id="passwordsSection" class="section">
             <div class="card">
@@ -802,12 +1005,23 @@
 
                     <div class="flex-row">
                         <div class="flex-1">
-                            <label for="passwordSite">Link do site (opcional)</label>
+                            <label for="passwordSite">Link do site</label>
                             <input type="text" id="passwordSite" placeholder="https://...">
                         </div>
                         <div class="flex-1">
                             <label for="passwordUser">Usuário</label>
                             <input type="text" id="passwordUser" required>
+                        </div>
+                    </div>
+
+                    <div class="flex-row">
+                        <div class="flex-1">
+                            <label for="passwordAgency">Agencia</label>
+                            <input type="text" id="passwordAgency">
+                        </div>
+                        <div class="flex-1">
+                            <label for="passwordAccount">Conta</label>
+                            <input type="text" id="passwordAccount">
                         </div>
                     </div>
 
@@ -896,12 +1110,27 @@
 
         <div class="options">
             <label><input type="radio" name="recurrenceChoice" value="this" checked> Apenas esta tarefa selecionada</label>
-            <label><input type="radio" name="recurrenceChoice" value="all"> Todas as tarefas da série</label>
+            <label><input type="radio" name="recurrenceChoice" value="future"> Esta tarefa e as futuras</label>
         </div>
 
         <div class="buttons">
             <button id="recurrenceCancelBtn" class="btn-secondary">Cancelar</button>
             <button id="recurrenceConfirmBtn">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal tarefa em andamento -->
+<div id="inProgressModal" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true" style="display:none;">
+    <div class="modal" role="document">
+        <h3 id="inProgressModalTitle">Tarefa em andamento</h3>
+        <div id="inProgressModalMessage" class="small-text" style="margin-bottom:8px;"></div>
+        <div class="small-text" id="inProgressModalHint" style="margin-bottom:8px;">
+            Se não responder em 3 minutos, a tarefa será marcada como Pendente. Ao clicar em Finalizar, ela será marcada como Concluída.
+        </div>
+        <div class="buttons">
+            <button id="inProgressContinueBtn">Continuar</button>
+            <button id="inProgressFinishBtn" class="btn-secondary">Finalizar</button>
         </div>
     </div>
 </div>
@@ -931,6 +1160,20 @@
     let companies = [];
     let tasks = [];
     let passwords = [];
+    let maps = [];
+    let currentMapId = null;
+    let editingMapNodeId = null;
+    let draggingMapNodeId = null;
+    let mapDragOffset = { x: 0, y: 0 };
+    let mapPan = { x: 0, y: 0 };
+    let mapPanning = false;
+    let mapPanStart = { x: 0, y: 0 };
+    let mapPanOrigin = { x: 0, y: 0 };
+    let mapScale = 1;
+    const MAP_BASE_WIDTH = 1200;
+    const MAP_BASE_HEIGHT = 800;
+    const MAP_MIN_PCT = -20;  // allow arrastar um pouco para fora à esquerda/acima
+    const MAP_MAX_PCT = 200;  // permite mais espaço à direita/abaixo
     let currentUser = null; // { id (email), email, username, role }
 
     let currentMonth;
@@ -950,8 +1193,15 @@
     let dayTasksSortField = null;
     let dayTasksSortDirection = 'asc';
     let dayTasksFilterResponsible = '';
+    let dayTasksFilterCompanyId = '';
 
     const selectedTaskIds = new Set();
+
+    // Controle de monitoramento de tarefas em andamento
+    const IN_PROGRESS_LIMIT_MS = 30 * 60 * 1000; // 30 minutos
+    const IN_PROGRESS_PROMPT_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos
+    let inProgressCheckInterval = null;
+    let inProgressPromptState = null; // { taskId, autoTimeout }
 
     let __openStatusDropdown = null;
     let __openStatusDropdownAnchor = null;
@@ -965,6 +1215,7 @@
         companies = [];
         tasks = [];
         passwords = [];
+        maps = [];
 
         // Carrega usuários
         try {
@@ -1019,6 +1270,27 @@
         } catch (e) {
             console.warn("Erro ao carregar 'passwords':", e);
         }
+
+        // Carrega mapas
+        try {
+            const mapsSnapshot = await db.collection('maps').get();
+            mapsSnapshot.forEach(doc => {
+                const m = { id: doc.id, ...doc.data() };
+                m.nodes = Array.isArray(m.nodes) ? m.nodes : [];
+                m.nodes = m.nodes.map(n => {
+                    return {
+                        ...n,
+                        x: typeof n.x === 'number' ? n.x : 10,
+                        y: typeof n.y === 'number' ? n.y : 10
+                    };
+                });
+                m.edges = Array.isArray(m.edges) ? m.edges : [];
+                m.edges = m.edges.map(e => e && e.id ? e : { ...e, id: generateId() });
+                maps.push(m);
+            });
+        } catch (e) {
+            console.warn("Erro ao carregar 'maps':", e);
+        }
     }
 
     function generateId() {
@@ -1046,6 +1318,26 @@
         if (!dateStr) return '';
         const [y, m, d] = dateStr.split('-');
         return `${d}/${m}/${y}`;
+    }
+
+    function formatCnpjCpf(value) {
+        const digits = (value || '').replace(/\D/g, '').slice(0, 14);
+        if (!digits) return '';
+
+        if (digits.length <= 11) {
+            let formatted = digits.slice(0, 3);
+            if (digits.length > 3) formatted += '.' + digits.slice(3, 6);
+            if (digits.length > 6) formatted += '.' + digits.slice(6, 9);
+            if (digits.length > 9) formatted += '-' + digits.slice(9, 11);
+            return formatted;
+        }
+
+        let formatted = digits.slice(0, 2);
+        if (digits.length > 2) formatted += '.' + digits.slice(2, 5);
+        if (digits.length > 5) formatted += '.' + digits.slice(5, 8);
+        if (digits.length > 8) formatted += '/' + digits.slice(8, 12);
+        if (digits.length > 12) formatted += '-' + digits.slice(12, 14);
+        return formatted;
     }
 
     function getTodayStr() {
@@ -1079,18 +1371,22 @@
         task.status = newStatus;
     }
 
+    // Reaplica a regra de recálculo: tarefas de ontem não concluídas vão para hoje como Pendente/Alta.
     function applyAutoCarryOver() {
         const todayStr = getTodayStr();
-        const todayDate = parseLocalDate(todayStr);
+        const yesterday = parseLocalDate(todayStr);
+        if (!yesterday) return;
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = dateToISO(yesterday);
+
         let changed = false;
 
         tasks.forEach(task => {
-            if (task.status !== 'Concluído' && task.date && task.date < todayStr) {
-                let d = parseLocalDate(task.date);
-                if (!d) return;
-                while (d < todayDate) d.setDate(d.getDate() + 1);
-                task.date = dateToISO(d);
+            const status = (task.status || '').toLowerCase();
+            if (task.date === yesterdayStr && !status.startsWith('conclu')) {
+                task.date = todayStr;
                 applyStatusChange(task, 'Pendente');
+                task.priority = 'Alta';
                 changed = true;
             }
         });
@@ -1100,6 +1396,158 @@
                 try { db.collection('tasks').doc(t.id).set(t); } catch (e) {}
             });
         }
+
+        deduplicateRecurringSameDay();
+    }
+
+        // Remove duplicatas de tarefas recorrentes no mesmo dia, mantendo somente uma ocorrência e somando tempo.
+    function deduplicateRecurringSameDay() {
+        const seen = new Map();
+        const toDelete = [];
+        const toUpdate = new Set();
+        const now = Date.now();
+
+        tasks.forEach(task => {
+            if (!task || !task.date) return;
+            const isRecurring = task.baseId || (task.recurrence && task.recurrence !== 'Nenhuma');
+            if (!isRecurring) return;
+
+            const baseKey = task.baseId || `${task.recurrence}|${task.title}|${task.responsible}|${task.companyId}`;
+            const key = `${baseKey}|${task.date}`;
+
+            if (!seen.has(key)) {
+                seen.set(key, task);
+            } else {
+                const kept = seen.get(key);
+                const extraTime = (task.timeSpentMs || 0) +
+                    (task.status === 'Em andamento' && typeof task.currentStart === 'number'
+                        ? Math.max(0, now - task.currentStart)
+                        : 0);
+
+                kept.timeSpentMs = (kept.timeSpentMs || 0) + extraTime;
+                toUpdate.add(kept.id);
+                toDelete.push(task.id);
+            }
+        });
+
+        if (!toDelete.length && !toUpdate.size) return;
+
+        const deleteSet = new Set(toDelete);
+        tasks = tasks.filter(t => !deleteSet.has(t.id));
+
+        toUpdate.forEach(id => {
+            const t = tasks.find(x => x.id === id);
+            if (t) {
+                try { db.collection('tasks').doc(id).set(t); } catch (e) {}
+            }
+        });
+
+        toDelete.forEach(id => {
+            try { db.collection('tasks').doc(id).delete(); } catch (e) {}
+        });
+    }
+
+    function closeInProgressPrompt() {
+        if (inProgressPromptState && inProgressPromptState.autoTimeout) {
+            clearTimeout(inProgressPromptState.autoTimeout);
+        }
+        inProgressPromptState = null;
+        const overlay = document.getElementById('inProgressModal');
+        if (overlay) {
+            overlay.style.display = 'none';
+            overlay.setAttribute('aria-hidden', 'true');
+        }
+    }
+
+    function finalizeInProgressTask(autoTriggered = false) {
+        if (!inProgressPromptState) return;
+        const taskId = inProgressPromptState.taskId;
+        closeInProgressPrompt();
+
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const newStatus = autoTriggered ? 'Pendente' : 'Concluído';
+        applyStatusChange(task, newStatus);
+        task.currentStart = null;
+        try { db.collection('tasks').doc(task.id).set(task); } catch (e) {}
+
+        refreshAllUI();
+        if (autoTriggered) {
+            showCopyToast('Tarefa marcada como Pendente automaticamente.');
+        } else {
+            showCopyToast('Tarefa marcada como Concluída.');
+        }
+    }
+
+    function continueInProgressTask() {
+        if (!inProgressPromptState) return;
+        const taskId = inProgressPromptState.taskId;
+        closeInProgressPrompt();
+
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const now = Date.now();
+        if (typeof task.currentStart === 'number' && task.currentStart) {
+            task.timeSpentMs = (task.timeSpentMs || 0) + (now - task.currentStart);
+        }
+        task.currentStart = now;
+        try { db.collection('tasks').doc(task.id).set(task); } catch (e) {}
+
+        startInProgressWatcher();
+    }
+
+    function openInProgressPrompt(task) {
+        if (!task) return;
+
+        closeInProgressPrompt();
+
+        const overlay = document.getElementById('inProgressModal');
+        const msgEl = document.getElementById('inProgressModalMessage');
+
+        if (msgEl) {
+            msgEl.innerText = `A tarefa "${task.title}" está em andamento há mais de 30 minutos. Ainda está realizando?`;
+        }
+
+        if (overlay) {
+            overlay.style.display = 'flex';
+            overlay.setAttribute('aria-hidden', 'false');
+        }
+
+        const autoTimeout = setTimeout(() => finalizeInProgressTask(true), IN_PROGRESS_PROMPT_TIMEOUT_MS);
+        inProgressPromptState = { taskId: task.id, autoTimeout };
+    }
+
+    function checkInProgressTasks() {
+        if (!currentUser || inProgressPromptState) return;
+
+        const now = Date.now();
+        const candidate = tasks.find(t =>
+            t &&
+            t.status === 'Em andamento' &&
+            typeof t.currentStart === 'number' &&
+            t.currentStart &&
+            (now - t.currentStart) >= IN_PROGRESS_LIMIT_MS
+        );
+
+        if (candidate) {
+            openInProgressPrompt(candidate);
+        }
+    }
+
+    function startInProgressWatcher() {
+        stopInProgressWatcher();
+        inProgressCheckInterval = setInterval(checkInProgressTasks, 60000);
+        checkInProgressTasks();
+    }
+
+    function stopInProgressWatcher() {
+        if (inProgressCheckInterval) {
+            clearInterval(inProgressCheckInterval);
+            inProgressCheckInterval = null;
+        }
+        closeInProgressPrompt();
     }
 
     function getVisibleTasks() {
@@ -1163,6 +1611,7 @@
         document.getElementById('nav-tasks').style.display =
             currentUser.role === 'Gestor' ? 'inline-block' : 'none';
 
+        document.getElementById('nav-maps').style.display = 'inline-block';
         document.getElementById('nav-passwords').style.display = 'inline-block';
 
         const passwordForm = document.getElementById('passwordForm');
@@ -1261,6 +1710,7 @@
 
         applyAutoCarryOver();
         showApp();
+        startInProgressWatcher();
 
         const loginButton = document.getElementById('loginButton');
         if (loginButton) {
@@ -1283,6 +1733,7 @@
             console.error('Erro ao sair:', e);
         }
         currentUser = null;
+        stopInProgressWatcher();
         showLogin();
     }
 
@@ -1328,6 +1779,8 @@
             document.getElementById('nav-companies').classList.add('active');
         } else if (sectionId === 'tasksSection') {
             document.getElementById('nav-tasks').classList.add('active');
+        } else if (sectionId === 'mapsSection') {
+            document.getElementById('nav-maps').classList.add('active');
         } else if (sectionId === 'passwordsSection') {
             document.getElementById('nav-passwords').classList.add('active');
         } else if (sectionId === 'usersSection') {
@@ -1343,6 +1796,12 @@
     }
 
     function refreshAllUI() {
+        const companyForm = document.getElementById('companyForm');
+        if (companyForm) {
+            companyForm.style.display =
+                currentUser && currentUser.role === 'Gestor' ? 'block' : 'none';
+        }
+
         renderUserSelect();
         renderCompanyOperatorSelect();
         renderCompanySelect();
@@ -1350,12 +1809,14 @@
         renderTasksTable();
         renderTasksOverview();
         renderCompaniesTable();
+        renderMapsUI();
         renderUsersTable();
         renderCalendar();
         renderInProgressTasks();
         renderPasswordCompanySelect();
         renderPasswordsTable();
         renderDayTasksResponsibleFilter();
+        renderDayTasksCompanyFilter();
         if (selectedDate) renderDayTasks(selectedDate);
     }
 
@@ -1366,6 +1827,12 @@
 
         const taskDateInput = document.getElementById('taskDate');
         if (taskDateInput) taskDateInput.value = getTodayStr();
+
+        const taskUserSelect = document.getElementById('taskUser');
+        if (taskUserSelect) taskUserSelect.value = '';
+
+        const taskCompanySelect = document.getElementById('taskCompany');
+        if (taskCompanySelect) taskCompanySelect.value = '';
 
         const recurrenceSelect = document.getElementById('taskRecurrence');
         if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
@@ -1534,6 +2001,7 @@
             renderCompanyOperatorSelect();
             renderTaskFilterOptions();
             renderDayTasksResponsibleFilter();
+            renderDayTasksCompanyFilter();
             showCopyToast('Usuário/perfil salvo com sucesso!');
         } catch (e) {
             console.error('Erro ao salvar usuário:', e);
@@ -1584,7 +2052,9 @@
             renderCompanyOperatorSelect();
             renderTaskFilterOptions();
             renderDayTasksResponsibleFilter();
-            showCopyToast('Usuário/perfil excluído.');
+            renderDayTasksCompanyFilter();
+            showCopyToast('Usuario/perfil excluido.');
+
         } catch (e) {
             console.error('Erro ao excluir usuário:', e);
             alert('Erro ao excluir usuário. Verifique as regras do Firestore.');
@@ -1626,6 +2096,18 @@
             opt.textContent = o.username + ' (Operador)';
             select.appendChild(opt);
         });
+    }
+
+    function applyCompanyCnpjMask() {
+        const input = document.getElementById('companyCNPJ');
+        if (!input) return;
+
+        const applyMask = () => {
+            input.value = formatCnpjCpf(input.value);
+        };
+
+        input.addEventListener('input', applyMask);
+        applyMask();
     }
 
     function handleCompanyForm(event) {
@@ -1699,6 +2181,7 @@
         renderCompaniesTable();
         renderCompanySelect();
         renderPasswordCompanySelect();
+        renderDayTasksCompanyFilter();
     }
 
     function cancelCompanyEdit() {
@@ -1728,6 +2211,10 @@
         if (!companies.length) {
             document.getElementById('companiesCount').innerText = '0';
             document.getElementById('companiesActiveCount').innerText = '0';
+            const g1 = document.getElementById('companiesActiveGroup1Count');
+            if (g1) g1.innerText = '0';
+            const g2 = document.getElementById('companiesActiveGroup2Count');
+            if (g2) g2.innerText = '0';
             container.innerHTML = '<p class="small-text">Nenhuma empresa cadastrada.</p>';
             return;
         }
@@ -1735,16 +2222,27 @@
         document.getElementById('companiesCount').innerText = String(companies.length);
         const activeCount = companies.filter(c => !!c.activeBPO).length;
         document.getElementById('companiesActiveCount').innerText = String(activeCount);
+        const activeGroup1 = companies.filter(c =>
+            !!c.activeBPO &&
+            ['Simples Nacional', 'Lucro Presumido', 'Lucro Real', 'MEI'].includes(c.regime)
+        ).length;
+        const activeGroup2 = companies.filter(c =>
+            !!c.activeBPO && c.regime === 'Livro Caixa'
+        ).length;
+        const g1 = document.getElementById('companiesActiveGroup1Count');
+        if (g1) g1.innerText = String(activeGroup1);
+        const g2 = document.getElementById('companiesActiveGroup2Count');
+        if (g2) g2.innerText = String(activeGroup2);
 
         const canManageCompanies = currentUser && currentUser.role === 'Gestor';
 
         let html = '<div class="table-wrapper"><table><thead><tr>' +
-            '<th>Nome</th><th>CNPJ</th><th>Regime</th><th>Operador responsável</th><th>Cliente ativo</th><th>Início BPO</th>';
+            '<th>Nome</th><th>CNPJ/CPF</th><th>Regime</th><th>Operador responsável</th><th>Cliente ativo</th><th>Início BPO</th>';
         if (canManageCompanies) html += '<th>Ações</th>';
         html += '</tr></thead><tbody>';
 
         companies.forEach(c => {
-            const cnpjDisplay = c.cnpj && c.cnpj.trim() ? c.cnpj : '-';
+            const cnpjDisplay = formatCnpjCpf(c.cnpj || '') || '-';
             const regimeDisplay = c.regime && c.regime.trim() ? c.regime : '-';
             const operatorDisplay = c.operatorResponsible && c.operatorResponsible.trim() ? c.operatorResponsible : '-';
             const activeDisplay = c.activeBPO ? '<strong style="color:#155724;">Sim</strong>' : 'Não';
@@ -1815,7 +2313,7 @@
         editingCompanyId = id;
 
         document.getElementById('companyName').value = c.name || '';
-        document.getElementById('companyCNPJ').value = c.cnpj || '';
+        document.getElementById('companyCNPJ').value = formatCnpjCpf(c.cnpj || '');
         document.getElementById('companyRegime').value = c.regime || '';
         document.getElementById('companyOperator').value = c.operatorResponsible || '';
         document.getElementById('companyActiveBPO').checked = !!c.activeBPO;
@@ -1842,7 +2340,8 @@
         renderCompaniesTable();
         renderCompanySelect();
         renderPasswordCompanySelect();
-        showCopyToast('Empresa excluída.');
+        renderDayTasksCompanyFilter();
+        showCopyToast('Empresa excluida.');
     }
 
     // ========================== TAREFAS (recorrência, filtros, etc.) ==========================
@@ -1857,6 +2356,19 @@
             t.responsible === task.responsible &&
             t.companyId === task.companyId
         );
+    }
+
+    function getFutureSeriesTasks(task, fromDateStr) {
+        const series = getSeriesTasks(task);
+        const pivot = parseLocalDate(fromDateStr || (task && task.date));
+        if (!pivot) return series;
+
+        const pivotTime = pivot.getTime();
+        return series.filter(t => {
+            const date = parseLocalDate(t.date);
+            if (!date) return true;
+            return date.getTime() >= pivotTime;
+        });
     }
 
     function createTaskClone(baseTask, dateStr) {
@@ -1953,7 +2465,7 @@
                 const chosen = overlay.querySelector('input[name="recurrenceChoice"]:checked');
                 const value = chosen ? chosen.value : 'this';
                 cleanup();
-                resolve(value === 'all' ? 'all' : 'this');
+                resolve(value === 'future' ? 'future' : 'this');
             }
 
             function onCancel() {
@@ -2005,17 +2517,18 @@
             } else {
                 if (task.recurrence && task.recurrence !== 'Nenhuma') {
                     const choice = await showRecurrenceModal(
-                        'Esta tarefa faz parte de uma recorrência.\n\nEscolha "Apenas esta ocorrência" para aplicar somente a alteração nesta tarefa ou "Todas as tarefas" para aplicar a TODAS as tarefas.',
+                        'Esta tarefa faz parte de uma recorrência.\n\nEscolha "Apenas esta tarefa" para aplicar somente nesta data ou "Esta e as futuras" para aplicar a partir desta data em diante.',
                         'Alterar tarefa recorrente'
                     );
 
                     if (choice === null) return;
 
-                    if (choice === 'all') {
-                        const series = getSeriesTasks(task);
+                    if (choice === 'future') {
+                        const series = getFutureSeriesTasks(task, task.date);
                         series.forEach(t => {
                             applyStatusChange(t, status);
                             t.title = title;
+                            if (t.id === task.id) t.date = date;
                             t.responsible = responsible;
                             t.companyId = companyId;
                             t.priority = priority;
@@ -2280,20 +2793,20 @@
 
         if (recurringSelected.length) {
             const choice = await showRecurrenceModal(
-                `Existem ${recurringSelected.length} tarefa(s) recorrente(s) selecionada(s). Deseja excluir todas as ocorrências das séries ou apenas as ocorrências selecionadas?`,
+                `Existem ${recurringSelected.length} tarefa(s) recorrente(s) selecionada(s). Deseja excluir esta(s) data(s) e as futuras da série ou apenas as selecionadas?`,
                 'Excluir tarefas recorrentes'
             );
             if (choice === null) return;
 
-            if (choice === 'all') {
+            if (choice === 'future') {
                 const toDeleteIds = new Set();
                 recurringSelected.forEach(t => {
-                    const series = getSeriesTasks(t);
+                    const series = getFutureSeriesTasks(t, t.date);
                     series.forEach(s => toDeleteIds.add(s.id));
                 });
                 selected.filter(t => !(t.recurrence && t.recurrence !== 'Nenhuma')).forEach(t => toDeleteIds.add(t.id));
 
-                if (!confirm(`Confirma excluir ${toDeleteIds.size} tarefas (inclui todas as ocorrências das séries)?`)) return;
+                if (!confirm(`Confirma excluir ${toDeleteIds.size} tarefas (inclui esta data e as futuras das séries selecionadas)?`)) return;
 
                 toDeleteIds.forEach(id => {
                     tasks = tasks.filter(x => x.id !== id);
@@ -2379,15 +2892,15 @@
 
         if (t.recurrence && t.recurrence !== 'Nenhuma') {
             const choice = await showRecurrenceModal(
-                'Esta tarefa faz parte de uma recorrência.\n\nEscolha "Todas as tarefas" para excluir TODAS as ocorrências recorrentes ou "Apenas esta tarefa" para excluir apenas ESTA.',
+                'Esta tarefa faz parte de uma recorrência.\n\nEscolha "Esta e as futuras" para excluir a partir desta data ou "Apenas esta tarefa" para excluir somente esta.',
                 'Excluir tarefa recorrente'
             );
 
             if (choice === null) return;
 
-            if (choice === 'all') {
-                const series = getSeriesTasks(t);
-                if (!confirm(`Confirma excluir ${series.length} tarefas recorrentes?`)) return;
+            if (choice === 'future') {
+                const series = getFutureSeriesTasks(t, t.date);
+                if (!confirm(`Confirma excluir ${series.length} tarefas recorrentes (esta e as futuras)?`)) return;
                 series.forEach(item => {
                     tasks = tasks.filter(x => x.id !== item.id);
                     try { db.collection('tasks').doc(item.id).delete(); } catch (e) {}
@@ -2733,12 +3246,16 @@
         showCopyToast('Status da tarefa atualizado.');
     }
 
+    function canUseDayTasksFilters() {
+        return currentUser && (currentUser.role === 'Gestor' || currentUser.role === 'Operador');
+    }
+
     function renderDayTasksResponsibleFilter() {
         const container = document.getElementById('dayTasksFilterContainer');
         const select = document.getElementById('dayTasksResponsibleFilter');
         if (!container || !select) return;
 
-        if (!currentUser || currentUser.role !== 'Gestor') {
+        if (!canUseDayTasksFilters()) {
             container.style.display = 'none';
             dayTasksFilterResponsible = '';
             return;
@@ -2754,7 +3271,19 @@
         optAll.textContent = 'Todos';
         select.appendChild(optAll);
 
-        users.forEach(u => {
+        let allowedUsers = [];
+        if (currentUser.role === 'Gestor') {
+            allowedUsers = users.slice();
+        } else {
+            allowedUsers = users.filter(u =>
+                (u.username || '').toLowerCase() === (currentUser.username || '').toLowerCase()
+            );
+            if (!allowedUsers.length && currentUser.username) {
+                allowedUsers.push({ username: currentUser.username });
+            }
+        }
+
+        allowedUsers.forEach(u => {
             const opt = document.createElement('option');
             opt.value = u.username;
             opt.textContent = u.username;
@@ -2762,10 +3291,54 @@
         });
 
         select.value = current;
+        if (select.value !== current) {
+            select.value = '';
+            dayTasksFilterResponsible = '';
+        }
     }
 
     function setDayTasksResponsibleFilter(value) {
         dayTasksFilterResponsible = value || '';
+        if (selectedDate) renderDayTasks(selectedDate);
+    }
+
+    function renderDayTasksCompanyFilter() {
+        const container = document.getElementById('dayTasksCompanyFilterContainer');
+        const select = document.getElementById('dayTasksCompanyFilter');
+        if (!container || !select) return;
+
+        if (!canUseDayTasksFilters()) {
+            container.style.display = 'none';
+            dayTasksFilterCompanyId = '';
+            return;
+        }
+
+        container.style.display = 'block';
+
+        const current = dayTasksFilterCompanyId || '';
+        select.innerHTML = '';
+
+        const optAll = document.createElement('option');
+        optAll.value = '';
+        optAll.textContent = 'Todas';
+        select.appendChild(optAll);
+
+        companies.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.name;
+            select.appendChild(opt);
+        });
+
+        select.value = current;
+        if (select.value !== current) {
+            select.value = '';
+            dayTasksFilterCompanyId = '';
+        }
+    }
+
+    function setDayTasksCompanyFilter(value) {
+        dayTasksFilterCompanyId = value || '';
         if (selectedDate) renderDayTasks(selectedDate);
     }
 
@@ -2777,7 +3350,7 @@
         let visible = getVisibleTasks().filter(t => {
             if (t.date !== dateStr) return false;
             if (dayTasksFilterResponsible && t.responsible !== dayTasksFilterResponsible) return false;
-
+            if (dayTasksFilterCompanyId && t.companyId !== dayTasksFilterCompanyId) return false;
             const showCompletedCheckbox = document.getElementById('dayTasksShowCompleted');
             const showCompleted = showCompletedCheckbox && showCompletedCheckbox.checked;
             if (!showCompleted && t.status === 'Concluído') return false;
@@ -2890,6 +3463,13 @@
         document.getElementById('taskDeleteBtn').style.display =
             (currentUser && currentUser.role === 'Gestor') ? 'inline-block' : 'none';
         document.getElementById('taskCancelBtn').style.display = 'inline-block';
+
+        const formEl = document.getElementById('taskForm');
+        if (formEl && formEl.scrollIntoView) {
+            formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     }
 
     // ========================== SENHAS ==========================
@@ -2933,6 +3513,8 @@
         const name = document.getElementById('passwordName').value.trim();
         const site = document.getElementById('passwordSite').value.trim();
         const username = document.getElementById('passwordUser').value.trim();
+        const agency = document.getElementById('passwordAgency').value.trim();
+        const account = document.getElementById('passwordAccount').value.trim();
         const pass = document.getElementById('passwordPass').value.trim();
         const observation = document.getElementById('passwordObservation').value.trim();
 
@@ -2950,6 +3532,8 @@
                 p.name = name;
                 p.site = site;
                 p.username = username;
+                p.agency = agency;
+                p.account = account;
                 p.password = pass;
                 p.observation = observation;
                 try { db.collection('passwords').doc(p.id).set(p); } catch (e) {}
@@ -2962,6 +3546,8 @@
                 name,
                 site,
                 username,
+                agency,
+                account,
                 password: pass,
                 observation
             };
@@ -3119,7 +3705,7 @@
         const isGestor = currentUser && currentUser.role === 'Gestor';
 
         let html = '<div class="table-wrapper"><table><thead><tr>' +
-            '<th>Empresa</th><th>Nome</th><th>Site</th><th>Usuário</th><th>Senha</th><th>Observação</th>';
+            '<th>Empresa</th><th>Nome</th><th>Site</th><th>Usuário</th><th>Senha</th>';
         if (isGestor) html += '<th>Ações</th>';
         html += '</tr></thead><tbody>';
 
@@ -3137,8 +3723,7 @@
                 <td>${p.name}</td>
                 <td>${siteLink}</td>
                 <td><span class="copyable" data-copy="${encodedUser}" onclick="handleCopyClick(this)">${p.username}</span></td>
-                <td><span class="copyable" data-copy="${encodedPass}" onclick="handleCopyClick(this)">${p.password}</span></td>
-                <td>${p.observation || ''}</td>`;
+                <td><span class="copyable" data-copy="${encodedPass}" onclick="handleCopyClick(this)">${p.password}</span></td>`;
             if (isGestor) {
                 html += `<td class="actions">
                     <button onclick="editPassword('${p.id}')">Editar</button>
@@ -3167,6 +3752,8 @@
         document.getElementById('passwordName').value = p.name || '';
         document.getElementById('passwordSite').value = p.site || '';
         document.getElementById('passwordUser').value = p.username || '';
+        document.getElementById('passwordAgency').value = p.agency || '';
+        document.getElementById('passwordAccount').value = p.account || '';
         document.getElementById('passwordPass').value = p.password || '';
         document.getElementById('passwordObservation').value = p.observation || '';
 
@@ -3188,6 +3775,608 @@
         showCopyToast('Senha excluída.');
     }
 
+    // ========================== MAPAS / FLUXOGRAMAS ==========================
+    function getCurrentMap() {
+        if (!currentMapId && maps.length) {
+            currentMapId = maps[0].id;
+        }
+        return maps.find(m => m.id === currentMapId) || null;
+    }
+
+    function saveCurrentMap() {
+        const map = getCurrentMap();
+        if (!map) return;
+        try { db.collection('maps').doc(map.id).set(map); } catch (e) {}
+    }
+
+    function toggleMapEditUI() {
+        const canEdit = currentUser && currentUser.role === 'Gestor';
+        document.querySelectorAll('.map-edit-only').forEach(el => {
+            el.style.display = canEdit ? 'block' : 'none';
+        });
+        const deleteBtn = document.getElementById('mapDeleteBtn');
+        if (deleteBtn) deleteBtn.style.display = canEdit ? 'inline-block' : 'none';
+    }
+
+    function renderMapSelect() {
+        const select = document.getElementById('mapSelect');
+        const deleteBtn = document.getElementById('mapDeleteBtn');
+        if (!select) return;
+
+        select.innerHTML = '';
+
+        if (!maps.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Nenhum fluxograma';
+            opt.disabled = true;
+            opt.selected = true;
+            select.appendChild(opt);
+            select.disabled = true;
+            currentMapId = null;
+            if (deleteBtn) deleteBtn.disabled = true;
+        } else {
+            select.disabled = false;
+            maps.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.name || 'Sem nome';
+                select.appendChild(opt);
+            });
+
+            if (currentMapId && maps.some(m => m.id === currentMapId)) {
+                select.value = currentMapId;
+            } else {
+                currentMapId = maps[0].id;
+                select.value = currentMapId;
+            }
+            if (deleteBtn) deleteBtn.disabled = !currentMapId;
+        }
+
+        const mapNameInput = document.getElementById('mapNameInput');
+        const map = getCurrentMap();
+        if (mapNameInput) mapNameInput.value = map ? (map.name || '') : '';
+    }
+
+    function handleMapSelectChange() {
+        const select = document.getElementById('mapSelect');
+        currentMapId = select ? (select.value || null) : null;
+        editingMapNodeId = null;
+        mapPan = { x: 0, y: 0 };
+        const mapNameInput = document.getElementById('mapNameInput');
+        const map = getCurrentMap();
+        if (mapNameInput) mapNameInput.value = map ? (map.name || '') : '';
+        renderMapsUI();
+    }
+
+    function createMap() {
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Apenas Gestores podem criar fluxogramas.');
+            return;
+        }
+        const input = document.getElementById('mapNameInput');
+        const name = input ? input.value.trim() : '';
+        if (!name) {
+            alert('Informe o nome do fluxograma.');
+            return;
+        }
+        const newMap = {
+            id: generateId(),
+            name,
+            nodes: [],
+            edges: []
+        };
+        maps.push(newMap);
+        currentMapId = newMap.id;
+        if (input) input.value = '';
+        try { db.collection('maps').doc(newMap.id).set(newMap); } catch (e) {}
+        renderMapsUI();
+        showCopyToast('Fluxograma criado.');
+    }
+
+    function deleteCurrentMap() {
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Apenas Gestores podem excluir fluxogramas.');
+            return;
+        }
+        const map = getCurrentMap();
+        if (!map) {
+            alert('Selecione um fluxograma.');
+            return;
+        }
+        if (!confirm('Excluir este fluxograma?')) return;
+        maps = maps.filter(m => m.id !== map.id);
+        try { db.collection('maps').doc(map.id).delete(); } catch (e) {}
+        currentMapId = maps.length ? maps[0].id : null;
+        editingMapNodeId = null;
+        renderMapsUI();
+        showCopyToast('Fluxograma excluido.');
+    }
+
+    function renameCurrentMap() {
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Apenas Gestores podem editar fluxogramas.');
+            return;
+        }
+        const map = getCurrentMap();
+        if (!map) {
+            alert('Selecione um fluxograma para editar.');
+            return;
+        }
+        const input = document.getElementById('mapNameInput');
+        const name = input ? input.value.trim() : '';
+        if (!name) {
+            alert('Informe o nome do fluxograma.');
+            return;
+        }
+        map.name = name;
+        saveCurrentMap();
+        showCopyToast('Nome do fluxograma atualizado.');
+        renderMapsUI();
+    }
+
+    function getNodePosition(map) {
+        const count = map.nodes.length;
+        const col = count % 4;
+        const row = Math.floor(count / 4);
+        const x = Math.min(90, 10 + col * 22);
+        const y = Math.min(90, 10 + row * 22);
+        return { x, y };
+    }
+
+    function resetMapNodeForm() {
+        editingMapNodeId = null;
+        const input = document.getElementById('mapNodeLabel');
+        if (input) input.value = '';
+        const delBtn = document.getElementById('mapNodeDeleteBtn');
+        if (delBtn) delBtn.style.display = 'none';
+        const nodeSelect = document.getElementById('mapNodeSelect');
+        if (nodeSelect) nodeSelect.value = '';
+    }
+
+    function saveMapNode() {
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Apenas Gestores podem criar/editar nós.');
+            return;
+        }
+        const map = getCurrentMap();
+        if (!map) {
+            alert('Crie um fluxograma primeiro.');
+            return;
+        }
+        const input = document.getElementById('mapNodeLabel');
+        const label = input ? input.value.trim() : '';
+        if (!label) {
+            alert('Informe o nome do nó.');
+            return;
+        }
+
+        if (editingMapNodeId) {
+            const node = map.nodes.find(n => n.id === editingMapNodeId);
+            if (node) {
+                node.label = label;
+            }
+        } else {
+            const pos = getNodePosition(map);
+            map.nodes.push({
+                id: generateId(),
+                label,
+                x: pos.x,
+                y: pos.y
+            });
+        }
+
+        saveCurrentMap();
+        resetMapNodeForm();
+        renderMapsUI();
+        showCopyToast('Salvo');
+    }
+
+    function deleteCurrentMapNode() {
+        if (!currentUser || currentUser.role !== 'Gestor') return;
+        const map = getCurrentMap();
+        if (!map || !editingMapNodeId) return;
+        map.nodes = map.nodes.filter(n => n.id !== editingMapNodeId);
+        map.edges = map.edges.filter(e => e.from !== editingMapNodeId && e.to !== editingMapNodeId);
+        saveCurrentMap();
+        resetMapNodeForm();
+        renderMapsUI();
+        showCopyToast('Nó removido.');
+    }
+
+    function saveMapEdge() {
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Apenas Gestores podem conectar nós.');
+            return;
+        }
+        const map = getCurrentMap();
+        if (!map) {
+            alert('Crie um fluxograma primeiro.');
+            return;
+        }
+
+        const fromSel = document.getElementById('mapEdgeFrom');
+        const toSel = document.getElementById('mapEdgeTo');
+        const from = fromSel ? fromSel.value : '';
+        const to = toSel ? toSel.value : '';
+
+        if (!from || !to) {
+            alert('Selecione os dois nós para conectar.');
+            return;
+        }
+        if (from === to) {
+            alert('Selecione nós diferentes.');
+            return;
+        }
+        const exists = map.edges.some(e => e.from === from && e.to === to);
+        if (exists) {
+            alert('Esta ligação já existe.');
+            return;
+        }
+        map.edges.push({ id: generateId(), from, to });
+        saveCurrentMap();
+        clearMapEdgeForm();
+        renderMapsUI();
+        showCopyToast('Ligação criada.');
+    }
+
+    function deleteMapEdge(id) {
+        if (!currentUser || currentUser.role !== 'Gestor') return;
+        const map = getCurrentMap();
+        if (!map) return;
+        map.edges = map.edges.filter(e => e.id !== id);
+        saveCurrentMap();
+        renderMapsUI();
+    }
+
+    function clearMapEdgeForm() {
+        const fromSel = document.getElementById('mapEdgeFrom');
+        const toSel = document.getElementById('mapEdgeTo');
+        if (fromSel) fromSel.value = '';
+        if (toSel) toSel.value = '';
+    }
+
+    function renderMapEdgeForm() {
+        const fromSel = document.getElementById('mapEdgeFrom');
+        const toSel = document.getElementById('mapEdgeTo');
+        const listEl = document.getElementById('mapEdgesList');
+        const nodeSelect = document.getElementById('mapNodeSelect');
+        if (!fromSel || !toSel || !listEl) return;
+
+        fromSel.innerHTML = '';
+        toSel.innerHTML = '';
+        listEl.innerHTML = '';
+        if (nodeSelect) nodeSelect.innerHTML = '';
+
+        const map = getCurrentMap();
+        if (!map) {
+            const p = document.createElement('p');
+            p.className = 'small-text';
+            p.textContent = 'Nenhum fluxograma selecionado.';
+            listEl.appendChild(p);
+            fromSel.disabled = true;
+            toSel.disabled = true;
+            if (nodeSelect) nodeSelect.disabled = true;
+            return;
+        }
+
+        const nodes = map.nodes;
+        const canEdit = currentUser && currentUser.role === 'Gestor';
+
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Nó';
+        placeholder.disabled = true;
+        placeholder.selected = true;
+        fromSel.appendChild(placeholder.cloneNode(true));
+        toSel.appendChild(placeholder.cloneNode(true));
+        if (nodeSelect) {
+            const placeholderNode = placeholder.cloneNode(true);
+            placeholderNode.textContent = 'Selecione o nó';
+            nodeSelect.appendChild(placeholderNode);
+        }
+
+        nodes.forEach(n => {
+            const opt1 = document.createElement('option');
+            opt1.value = n.id;
+            opt1.textContent = n.label || 'Nó';
+            fromSel.appendChild(opt1);
+
+            const opt2 = document.createElement('option');
+            opt2.value = n.id;
+            opt2.textContent = n.label || 'Nó';
+            toSel.appendChild(opt2);
+
+            if (nodeSelect) {
+                const optNode = document.createElement('option');
+                optNode.value = n.id;
+                optNode.textContent = n.label || 'Nó';
+                nodeSelect.appendChild(optNode);
+            }
+        });
+
+        fromSel.disabled = !canEdit || !nodes.length;
+        toSel.disabled = !canEdit || !nodes.length;
+        if (nodeSelect) nodeSelect.disabled = !canEdit || !nodes.length;
+
+        if (!map.edges.length) {
+            const p = document.createElement('p');
+            p.className = 'small-text';
+            p.textContent = 'Nenhuma ligação criada.';
+            listEl.appendChild(p);
+        } else {
+            map.edges.forEach(e => {
+                const fromNode = nodes.find(n => n.id === e.from);
+                const toNode = nodes.find(n => n.id === e.to);
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.justifyContent = 'space-between';
+                row.style.alignItems = 'center';
+                row.style.marginBottom = '4px';
+                row.innerHTML = `<span>${fromNode ? fromNode.label : 'Nó'} -> ${toNode ? toNode.label : 'Nó'}</span>`;
+                if (canEdit) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn-secondary';
+                    btn.textContent = 'Excluir';
+                    btn.onclick = () => deleteMapEdge(e.id);
+                    row.appendChild(btn);
+                }
+                listEl.appendChild(row);
+            });
+        }
+    }
+
+    function renderMapNodeForm() {
+        const delBtn = document.getElementById('mapNodeDeleteBtn');
+        if (delBtn) delBtn.style.display = editingMapNodeId ? 'inline-block' : 'none';
+    }
+
+    function getMapDimensions() {
+        const width = MAP_BASE_WIDTH * (MAP_MAX_PCT - MAP_MIN_PCT) / 100;
+        const height = MAP_BASE_HEIGHT * (MAP_MAX_PCT - MAP_MIN_PCT) / 100;
+        const offsetX = -MAP_MIN_PCT / 100 * MAP_BASE_WIDTH;
+        const offsetY = -MAP_MIN_PCT / 100 * MAP_BASE_HEIGHT;
+        return { width, height, offsetX, offsetY };
+    }
+
+    function renderMapCanvas() {
+        const canvas = document.getElementById('mapCanvas');
+        const nodesLayer = document.getElementById('mapNodesLayer');
+        const edgesLayer = document.getElementById('mapEdgesLayer');
+        const hint = document.getElementById('mapCanvasHint');
+        if (!canvas || !nodesLayer || !edgesLayer) return;
+
+        nodesLayer.innerHTML = '';
+        edgesLayer.innerHTML = '';
+
+        const map = getCurrentMap();
+        const canEdit = currentUser && currentUser.role === 'Gestor';
+
+        if (!map) {
+            if (hint) hint.textContent = 'Crie um fluxograma para começar.';
+            return;
+        }
+
+        const nodes = map.nodes || [];
+        const edges = map.edges || [];
+        nodes.forEach(n => {
+            n.x = typeof n.x === 'number' ? n.x : 10;
+            n.y = typeof n.y === 'number' ? n.y : 10;
+            n.x = Math.max(MAP_MIN_PCT, Math.min(MAP_MAX_PCT, n.x));
+            n.y = Math.max(MAP_MIN_PCT, Math.min(MAP_MAX_PCT, n.y));
+        });
+
+        const baseWidth = MAP_BASE_WIDTH;
+        const baseHeight = MAP_BASE_HEIGHT;
+        const { width: mapWidth, height: mapHeight, offsetX, offsetY } = getMapDimensions();
+        nodesLayer.style.width = `${mapWidth}px`;
+        nodesLayer.style.height = `${mapHeight}px`;
+        edgesLayer.setAttribute('width', String(mapWidth));
+        edgesLayer.setAttribute('height', String(mapHeight));
+        edgesLayer.style.width = `${mapWidth}px`;
+        edgesLayer.style.height = `${mapHeight}px`;
+        edgesLayer.setAttribute('viewBox', `0 0 ${mapWidth} ${mapHeight}`);
+
+        nodes.forEach(n => {
+            const nodeEl = document.createElement('div');
+            nodeEl.className = 'map-node' + (canEdit ? '' : ' readonly');
+            nodeEl.textContent = n.label || 'Nó';
+            const leftPx = (n.x / 100) * baseWidth + offsetX;
+            const topPx = (n.y / 100) * baseHeight + offsetY;
+            nodeEl.style.left = `${leftPx}px`;
+            nodeEl.style.top = `${topPx}px`;
+            nodeEl.dataset.id = n.id;
+            nodeEl.onclick = () => {
+                if (!canEdit) return;
+                editingMapNodeId = n.id;
+                const input = document.getElementById('mapNodeLabel');
+                if (input) input.value = n.label || '';
+                renderMapNodeForm();
+            };
+            if (canEdit) {
+                nodeEl.onmousedown = (ev) => startMapNodeDrag(ev, n.id);
+            }
+            nodesLayer.appendChild(nodeEl);
+        });
+
+        const nodesMap = new Map();
+        nodesLayer.childNodes.forEach(el => {
+            if (el.dataset && el.dataset.id) nodesMap.set(el.dataset.id, el);
+        });
+
+        const targetWidth = canvas.clientWidth;
+        mapScale = Math.min(1, Math.max(0.6, targetWidth / baseWidth));
+
+        const buildCurvePath = (x1, y1, x2, y2) => {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const direction = dx === 0 ? 1 : Math.sign(dx);
+            const curvature = Math.max(40, Math.min(Math.abs(dx) * 0.6, 160));
+            const c1x = x1 + direction * curvature;
+            const c2x = x2 - direction * curvature;
+            const c1y = y1 + dy * 0.2;
+            const c2y = y2 - dy * 0.2;
+            return `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
+        };
+
+        edges.forEach(e => {
+            const fromEl = nodesMap.get(e.from);
+            const toEl = nodesMap.get(e.to);
+            if (!fromEl || !toEl) return;
+
+            const fromNode = nodes.find(n => n.id === e.from);
+            const toNode = nodes.find(n => n.id === e.to);
+            if (!fromNode || !toNode) return;
+
+            const fromWidth = fromEl.offsetWidth;
+            const fromHeight = fromEl.offsetHeight;
+            const toWidth = toEl.offsetWidth;
+            const toHeight = toEl.offsetHeight;
+
+            const fromCenterX = (fromNode.x / 100) * baseWidth + offsetX + fromWidth / 2;
+            const fromCenterY = (fromNode.y / 100) * baseHeight + offsetY + fromHeight / 2;
+            const toCenterX = (toNode.x / 100) * baseWidth + offsetX + toWidth / 2;
+            const toCenterY = (toNode.y / 100) * baseHeight + offsetY + toHeight / 2;
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', buildCurvePath(fromCenterX, fromCenterY, toCenterX, toCenterY));
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', '#7b7b65');
+            path.setAttribute('stroke-width', '2.5');
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('stroke-linejoin', 'round');
+            edgesLayer.appendChild(path);
+        });
+
+        const translateStr = `translate(${mapPan.x}px, ${mapPan.y}px) scale(${mapScale})`;
+        nodesLayer.style.transform = translateStr;
+        edgesLayer.style.transform = translateStr;
+
+        if (hint) {
+            hint.textContent = canEdit
+                ? 'Arraste os nós para posicionar. Use os campos ao lado para criar nós e ligações.'
+                : 'Visualização somente leitura.';
+        }
+    }
+
+    function renderMapsUI() {
+        toggleMapEditUI();
+        renderMapSelect();
+        renderMapEdgeForm();
+        renderMapNodeForm();
+        renderMapCanvas();
+
+        const mapPanel = document.querySelector('#mapsSection .map-panel');
+        if (mapPanel) {
+            const isGestor = currentUser && currentUser.role === 'Gestor';
+            if (isGestor) {
+                mapPanel.classList.remove('readonly');
+            } else {
+                mapPanel.classList.add('readonly');
+            }
+        }
+    }
+
+    function loadNodeForEdit() {
+        if (!currentUser || currentUser.role !== 'Gestor') {
+            alert('Apenas Gestores podem editar nós.');
+            return;
+        }
+        const select = document.getElementById('mapNodeSelect');
+        if (!select) return;
+        const nodeId = select.value;
+        if (!nodeId) {
+            alert('Selecione o nó para editar.');
+            return;
+        }
+        const map = getCurrentMap();
+        if (!map) return;
+        const node = map.nodes.find(n => n.id === nodeId);
+        if (!node) return;
+        editingMapNodeId = nodeId;
+        const input = document.getElementById('mapNodeLabel');
+        if (input) input.value = node.label || '';
+        renderMapNodeForm();
+    }
+
+    function startMapNodeDrag(ev, id) {
+        if (!currentUser || currentUser.role !== 'Gestor') return;
+        draggingMapNodeId = id;
+        const map = getCurrentMap();
+        const canvas = document.getElementById('mapCanvas');
+        const node = map ? map.nodes.find(n => n.id === id) : null;
+        if (!map || !canvas || !node) {
+            mapDragOffset = { x: 0, y: 0 };
+            return;
+        }
+
+        const canvasRect = canvas.getBoundingClientRect();
+        const { offsetX, offsetY } = getMapDimensions();
+        const mouseLogicalX = (ev.clientX - canvasRect.left) / mapScale - mapPan.x;
+        const mouseLogicalY = (ev.clientY - canvasRect.top) / mapScale - mapPan.y;
+        const nodeLeft = (node.x / 100) * MAP_BASE_WIDTH + offsetX;
+        const nodeTop = (node.y / 100) * MAP_BASE_HEIGHT + offsetY;
+        mapDragOffset = {
+            x: mouseLogicalX - nodeLeft,
+            y: mouseLogicalY - nodeTop
+        };
+        ev.preventDefault();
+    }
+
+    function handleMapNodeDrag(ev) {
+        if (!draggingMapNodeId) return;
+        const map = getCurrentMap();
+        const canvas = document.getElementById('mapCanvas');
+        if (!map || !canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const { offsetX, offsetY } = getMapDimensions();
+        const node = map.nodes.find(n => n.id === draggingMapNodeId);
+        if (!node) return;
+
+        const logicalX = (ev.clientX - rect.left) / mapScale - mapPan.x;
+        const logicalY = (ev.clientY - rect.top) / mapScale - mapPan.y;
+        let xPerc = (logicalX - mapDragOffset.x - offsetX) / MAP_BASE_WIDTH * 100;
+        let yPerc = (logicalY - mapDragOffset.y - offsetY) / MAP_BASE_HEIGHT * 100;
+        xPerc = Math.max(MAP_MIN_PCT, Math.min(MAP_MAX_PCT, xPerc));
+        yPerc = Math.max(MAP_MIN_PCT, Math.min(MAP_MAX_PCT, yPerc));
+        node.x = xPerc;
+        node.y = yPerc;
+        renderMapCanvas();
+    }
+
+    function stopMapNodeDrag() {
+        if (!draggingMapNodeId) return;
+        draggingMapNodeId = null;
+        saveCurrentMap();
+    }
+
+    function startMapPan(ev) {
+        const canvas = document.getElementById('mapCanvas');
+        if (!canvas) return;
+        if (ev.target.closest('.map-node')) return; // se clicar num nó, não pan
+        if (draggingMapNodeId) return;
+        mapPanning = true;
+        mapPanStart = { x: ev.clientX, y: ev.clientY };
+        mapPanOrigin = { ...mapPan };
+        canvas.classList.add('grabbing');
+        ev.preventDefault();
+    }
+
+    function handleMapPanDrag(ev) {
+        if (!mapPanning) return;
+        const dx = ev.clientX - mapPanStart.x;
+        const dy = ev.clientY - mapPanStart.y;
+        mapPan = { x: mapPanOrigin.x + dx, y: mapPanOrigin.y + dy };
+        renderMapCanvas();
+    }
+
+    function stopMapPan() {
+        if (!mapPanning) return;
+        mapPanning = false;
+        const canvas = document.getElementById('mapCanvas');
+        if (canvas) canvas.classList.remove('grabbing');
+    }
     // ========================== INICIALIZAÇÃO ==========================
     document.addEventListener('DOMContentLoaded', function () {
         // Não chamamos loadData aqui para evitar leituras antes do login
@@ -3197,18 +4386,65 @@
         document.getElementById('companyForm').addEventListener('submit', handleCompanyForm);
         document.getElementById('taskForm').addEventListener('submit', handleTaskForm);
 
+        applyCompanyCnpjMask();
+        document.addEventListener('mousemove', handleMapNodeDrag);
+        document.addEventListener('mouseup', stopMapNodeDrag);
+
         const passwordForm = document.getElementById('passwordForm');
         if (passwordForm) {
             passwordForm.addEventListener('submit', handlePasswordForm);
         }
+
+        const mapCanvas = document.getElementById('mapCanvas');
+        if (mapCanvas) {
+            mapCanvas.addEventListener('mousedown', startMapPan);
+        }
+        document.addEventListener('mousemove', handleMapPanDrag);
+        document.addEventListener('mouseup', stopMapPan);
+
+        const inProgressContinueBtn = document.getElementById('inProgressContinueBtn');
+        const inProgressFinishBtn = document.getElementById('inProgressFinishBtn');
+        if (inProgressContinueBtn) inProgressContinueBtn.addEventListener('click', continueInProgressTask);
+        if (inProgressFinishBtn) inProgressFinishBtn.addEventListener('click', () => finalizeInProgressTask(false));
 
         const taskDateInput = document.getElementById('taskDate');
         function fillTodayIfEmpty() {
             if (!taskDateInput.value) taskDateInput.value = getTodayStr();
         }
         taskDateInput.addEventListener('focus', fillTodayIfEmpty);
-        taskDateInput.addEventListener('click', fillTodayIfEmpty);
+        taskDateInput.addEventListener('click', function () {
+            if (taskDateInput.dataset.pickerOpen === 'true') {
+                taskDateInput.blur(); // fecha o calendário se já estiver aberto
+                taskDateInput.dataset.pickerOpen = '';
+                return;
+            }
+            fillTodayIfEmpty();
+            taskDateInput.dataset.pickerOpen = 'true';
+            if (taskDateInput.showPicker) taskDateInput.showPicker();
+        });
+        taskDateInput.addEventListener('blur', function () {
+            taskDateInput.dataset.pickerOpen = '';
+        });
         taskDateInput.value = getTodayStr();
+
+        function attachDateToggle(input) {
+            if (!input) return;
+            input.addEventListener('click', function () {
+                if (input.dataset.pickerOpen === 'true') {
+                    input.blur();
+                    input.dataset.pickerOpen = '';
+                    return;
+                }
+                input.dataset.pickerOpen = 'true';
+                if (input.showPicker) input.showPicker();
+            });
+            input.addEventListener('blur', function () {
+                input.dataset.pickerOpen = '';
+            });
+        }
+
+        attachDateToggle(document.getElementById('filterStartDate'));
+        attachDateToggle(document.getElementById('filterEndDate'));
 
         const recurrenceSelect = document.getElementById('taskRecurrence');
         if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
@@ -3219,6 +4455,7 @@
         renderUsersTable();
         renderTaskFilterOptions();
         renderDayTasksResponsibleFilter();
+        renderDayTasksCompanyFilter();
         renderCalendar();
 
         // Atualiza lista de tarefas do dia ao marcar/desmarcar "Mostrar concluídas"
@@ -3242,4 +4479,16 @@
 
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
 
