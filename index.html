@@ -1525,6 +1525,7 @@
         const now = Date.now();
         const candidate = tasks.find(t =>
             t &&
+            t.responsible === currentUser.username &&
             t.status === 'Em andamento' &&
             typeof t.currentStart === 'number' &&
             t.currentStart &&
