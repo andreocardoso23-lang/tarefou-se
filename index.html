@@ -2,6 +2,10 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="theme-color" content="#1a73e8">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="capivara-login.png">
+    <link rel="apple-touch-icon" href="capivara-login.png">
     <title>Tarefou-se!</title>
 
     <!-- Firebase (versão compat para uso simples em HTML) -->
@@ -1202,11 +1206,134 @@
     const IN_PROGRESS_PROMPT_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos
     let inProgressCheckInterval = null;
     let inProgressPromptState = null; // { taskId, autoTimeout }
+    const BASE_PAGE_TITLE = document.title || 'Tarefou-se!';
+    let titleBlinkInterval = null;
+    let swRegistration = null;
+    let audioContext = null;
 
     let __openStatusDropdown = null;
     let __openStatusDropdownAnchor = null;
     let __outsideClickHandler = null;
     let __escapeHandler = null;
+
+    // ========================== PWA E NOTIFICA€ÇO ==========================
+    async function registerServiceWorker() {
+        if (!('serviceWorker' in navigator)) return null;
+        if (swRegistration) return swRegistration;
+        try {
+            swRegistration = await navigator.serviceWorker.register('./service-worker.js');
+        } catch (e) {
+            console.warn('Falha ao registrar service worker:', e);
+        }
+        return swRegistration;
+    }
+
+    async function setupPWA() {
+        try {
+            await registerServiceWorker();
+        } catch (e) {
+            console.warn('Falha ao configurar PWA:', e);
+        }
+    }
+
+    async function ensureNotificationPermission() {
+        if (!('Notification' in window)) return false;
+        if (Notification.permission === 'granted') return true;
+        if (Notification.permission === 'denied') return false;
+        try {
+            const result = await Notification.requestPermission();
+            return result === 'granted';
+        } catch (e) {
+            console.warn('Erro ao solicitar permissao de notificacao:', e);
+            return false;
+        }
+    }
+
+    async function showInProgressNotification(task) {
+        const hasPermission = await ensureNotificationPermission();
+        if (!hasPermission) return;
+
+        const registration = await registerServiceWorker();
+        const title = 'Tarefa em andamento - atencao';
+        const options = {
+            body: task && task.title
+                ? `A tarefa "${task.title}" esta em andamento ha mais de 30 minutos.`
+                : 'Existe uma tarefa em andamento ha mais de 30 minutos.',
+            tag: 'task-in-progress',
+            renotify: true,
+            icon: 'capivara-login.png',
+            badge: 'capivara-login.png',
+            data: { url: './erp.html' }
+        };
+
+        try {
+            if (registration && registration.showNotification) {
+                await registration.showNotification(title, options);
+            } else if ('Notification' in window) {
+                new Notification(title, options);
+            }
+        } catch (e) {
+            console.warn('Nao foi possivel disparar notificacao via service worker:', e);
+        }
+    }
+
+    function playInProgressTone() {
+        try {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return;
+            audioContext = audioContext || new Ctx();
+            const ctx = audioContext;
+            const duration = 1;
+            const oscillator = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+
+            gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+
+            oscillator.connect(gain);
+            gain.connect(ctx.destination);
+
+            oscillator.start();
+            oscillator.stop(ctx.currentTime + duration);
+        } catch (e) {
+            console.warn('Erro ao tocar alerta de tarefa:', e);
+        }
+    }
+
+    function startTitleBlink(message = 'Tarefa em andamento') {
+        stopTitleBlink();
+        let toggle = false;
+        const alertTitle = message;
+        titleBlinkInterval = setInterval(() => {
+            document.title = toggle ? alertTitle : BASE_PAGE_TITLE;
+            toggle = !toggle;
+        }, 1200);
+    }
+
+    function stopTitleBlink() {
+        if (titleBlinkInterval) {
+            clearInterval(titleBlinkInterval);
+            titleBlinkInterval = null;
+        }
+        document.title = BASE_PAGE_TITLE;
+    }
+
+    function triggerInProgressAlert(task) {
+        startTitleBlink('Tarefa em andamento!');
+        playInProgressTone();
+        showInProgressNotification(task);
+    }
+
+    window.addEventListener('focus', stopTitleBlink);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            stopTitleBlink();
+        }
+    });
 
     // ========================== AUXILIARES GERAIS ==========================
     async function loadData() {
@@ -1452,6 +1579,7 @@
             clearTimeout(inProgressPromptState.autoTimeout);
         }
         inProgressPromptState = null;
+        stopTitleBlink();
         const overlay = document.getElementById('inProgressModal');
         if (overlay) {
             overlay.style.display = 'none';
@@ -1514,6 +1642,8 @@
             overlay.style.display = 'flex';
             overlay.setAttribute('aria-hidden', 'false');
         }
+
+        triggerInProgressAlert(task);
 
         const autoTimeout = setTimeout(() => finalizeInProgressTask(true), IN_PROGRESS_PROMPT_TIMEOUT_MS);
         inProgressPromptState = { taskId: task.id, autoTimeout };
@@ -4381,6 +4511,8 @@
     // ========================== INICIALIZAÇÃO ==========================
     document.addEventListener('DOMContentLoaded', function () {
         // Não chamamos loadData aqui para evitar leituras antes do login
+
+        setupPWA();
 
         document.getElementById('loginForm').addEventListener('submit', handleLogin);
         document.getElementById('userForm').addEventListener('submit', handleUserForm);
