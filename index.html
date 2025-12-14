@@ -1,10 +1,10 @@
-?<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="theme-color" content="#1a73e8">
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="icon" href="icone.png">
+    <link rel="icon" href="favicon-transparente-32x32.png">
     <link rel="apple-touch-icon" href="icone.png">
     <title>Tarefou-se!</title>
 
@@ -167,6 +167,14 @@
         header .logo {
             font-weight: bold;
             font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        header .logo img {
+            width: 36px;
+            height: 36px;
         }
 
         nav {
@@ -695,7 +703,10 @@
 <!-- APP -->
 <div id="appView">
     <header>
-        <div class="logo">Tarefou-se!</div>
+        <div class="logo">
+            <img src="favicon-transparente-32x32.png" alt="Icone do Tarefou-se">
+            Tarefou-se!
+        </div>
         <nav>
             <a id="nav-dashboard" onclick="showSection('dashboardSection')" class="active">Dashboard</a>
             <a id="nav-companies" onclick="showSection('companiesSection')">Empresas</a>
