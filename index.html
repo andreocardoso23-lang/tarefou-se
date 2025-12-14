@@ -1,11 +1,11 @@
-﻿<!DOCTYPE html>
+?<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="theme-color" content="#1a73e8">
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="icon" href="capivara-login.png">
-    <link rel="apple-touch-icon" href="capivara-login.png">
+    <link rel="icon" href="icone.png">
+    <link rel="apple-touch-icon" href="icone.png">
     <title>Tarefou-se!</title>
 
     <!-- Firebase (versão compat para uso simples em HTML) -->
@@ -296,6 +296,45 @@
             margin-right: 4px;
             margin-top: 2px;
         }
+
+        .company-options-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .company-checkbox-field {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 150px;
+        }
+
+        .company-date-field {
+            min-width: 220px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .company-date-field .small-text {
+            margin-top: 4px;
+        }
+
+        .company-operator-field {
+            min-width: 240px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .company-buttons-field {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            justify-content: flex-start;
+        }
+
 
         .calendar-container {
             display: flex;
@@ -779,6 +818,12 @@
                                         <option value="">Todas</option>
                                     </select>
                                 </div>
+                                <div id="dayTasksSectorFilterContainer" class="small-text" style="display:none; margin-right:8px;">
+                                    <label for="dayTasksSectorFilter" style="margin-right:4px;">Setor:</label>
+                                    <select id="dayTasksSectorFilter" onchange="setDayTasksSectorFilter(this.value)">
+                                        <option value="">Todos</option>
+                                    </select>
+                                </div>
                                 <div class="small-text" style="display:flex; align-items:center;">
                                     <input type="checkbox" id="dayTasksShowCompleted" style="margin-right:4px;">
                                     <label for="dayTasksShowCompleted">Mostrar concluídas</label>
@@ -809,8 +854,10 @@
                         </div>
                     </div>
 
-                    <div class="flex-row" style="align-items:flex-end;">
-                        <div class="flex-1">
+                    <div class="flex-row" style="align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                        <div class="flex-1" style="order:2;">
+                            <label for="companyMunicipalRegistration">Inscrição Municipal</label>
+                            <input type="text" id="companyMunicipalRegistration" placeholder="0.000.000-0">
                             <label for="companyRegime">Regime Tributário</label>
                             <select id="companyRegime">
                                 <option value="">-- Selecionar --</option>
@@ -821,58 +868,143 @@
                                 <option value="Livro Caixa">Livro Caixa</option>
                             </select>
                         </div>
-                        <div class="flex-1">
-                            <label for="companyOperator">Operador responsável</label>
-                            <select id="companyOperator">
-                                <option value="">-- Selecionar --</option>
-                            </select>
-                        </div>
-                        <div class="flex-1" style="display:flex; align-items:flex-end; justify-content:flex-end; gap:12px;">
-                            <div style="display:flex; align-items:center; margin-right:auto;">
-                                <input type="checkbox" id="companyActiveBPO">
-                                <label for="companyActiveBPO" style="margin:0;">Cliente ativo BPO</label>
+                        <div style="flex:2; width:100%; order:1;">
+                            <div class="company-options-row">
+                                <div class="company-checkbox-field">
+                                    <input type="checkbox" id="companyActiveBPO">
+                                    <label for="companyActiveBPO" style="margin:0;">BPO</label>
+                                </div>
+                                <div class="company-date-field">
+                                    <label for="companyBPOStart">Data de Início</label>
+                                    <input type="date" id="companyBPOStart">
+                                </div>
+                                <div class="company-operator-field">
+                                    <label for="companyOperator">Executor responsável</label>
+                                    <select id="companyOperator">
+                                        <option value="">-- Selecionar --</option>
+                                    </select>
+                                </div>
                             </div>
-                            <button type="submit" id="companySubmitBtn">Adicionar empresa</button>
-                            <button type="button"
-                                    id="companyCancelBtn"
-                                    class="btn-secondary"
-                                    style="display:none;"
-                                    onclick="cancelCompanyEdit()">
-                                Voltar
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="flex-row" style="align-items:center;">
-                        <div class="flex-1">
-                            <label for="companyBPOStart">Data de início do serviço BPO</label>
-                            <input type="date" id="companyBPOStart">
-                        </div>
-                        <div style="width:220px; align-self:flex-end;">
-                            <span class="small-text">Preencha apenas se já houver início do BPO.</span>
+                            <div class="company-options-row">
+                                <div class="company-checkbox-field">
+                                    <input type="checkbox" id="companyActiveDP">
+                                    <label for="companyActiveDP" style="margin:0;">DP</label>
+                                </div>
+                                <div class="company-date-field">
+                                    <label for="companyDPStart">Data de Início</label>
+                                    <input type="date" id="companyDPStart">
+                                </div>
+                                <div class="company-operator-field">
+                                    <label for="companyDPResponsible">Executor responsável</label>
+                                    <select id="companyDPResponsible">
+                                        <option value="">-- Selecionar --</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="company-options-row">
+                                <div class="company-checkbox-field">
+                                    <input type="checkbox" id="companyActiveContabil">
+                                    <label for="companyActiveContabil" style="margin:0;">Contábil</label>
+                                </div>
+                                <div class="company-date-field">
+                                    <label for="companyContabilStart">Data de Início</label>
+                                    <input type="date" id="companyContabilStart">
+                                </div>
+                                <div class="company-operator-field">
+                                    <label for="companyContabilResponsible">Executor responsável</label>
+                                    <select id="companyContabilResponsible">
+                                        <option value="">-- Selecionar --</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="company-options-row">
+                                <div class="company-checkbox-field">
+                                    <input type="checkbox" id="companyActiveFiscal">
+                                    <label for="companyActiveFiscal" style="margin:0;">Fiscal</label>
+                                </div>
+                                <div class="company-date-field">
+                                    <label for="companyFiscalStart">Data de Início</label>
+                                    <input type="date" id="companyFiscalStart">
+                                </div>
+                                <div class="company-operator-field">
+                                    <label for="companyFiscalResponsible">Executor responsável</label>
+                                    <select id="companyFiscalResponsible">
+                                        <option value="">-- Selecionar --</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="company-options-row">
+                                <div class="company-checkbox-field">
+                                    <input type="checkbox" id="companyActiveLivroCaixa">
+                                    <label for="companyActiveLivroCaixa" style="margin:0;">Livro Caixa</label>
+                                </div>
+                                <div class="company-date-field">
+                                    <label for="companyLivroCaixaStart">Data de Início</label>
+                                    <input type="date" id="companyLivroCaixaStart">
+                                </div>
+                                <div class="company-operator-field">
+                                    <label for="companyLivroCaixaResponsible">Executor responsável</label>
+                                    <select id="companyLivroCaixaResponsible">
+                                        <option value="">-- Selecionar --</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="company-options-row">
+                                <div class="company-checkbox-field">
+                                    <input type="checkbox" id="companyActiveLegalizacao">
+                                    <label for="companyActiveLegalizacao" style="margin:0;">Legalização</label>
+                                </div>
+                                <div class="company-date-field">
+                                    <label for="companyLegalizacaoStart">Data de Início</label>
+                                    <input type="date" id="companyLegalizacaoStart">
+                                </div>
+                                <div class="company-operator-field">
+                                    <label for="companyLegalizacaoResponsible">Executor responsável</label>
+                                    <select id="companyLegalizacaoResponsible">
+                                        <option value="">-- Selecionar --</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="company-buttons-field">
+                                <button type="submit" id="companySubmitBtn">Adicionar empresa</button>
+                                <button type="button"
+                                        id="companyCancelBtn"
+                                        class="btn-secondary"
+                                        style="display:none;"
+                                        onclick="cancelCompanyEdit()">
+                                    Voltar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </form>
             </div>
 
             <div class="card">
-                <h2>
-                    Empresas cadastradas
-                    <span id="companiesCount" class="count-badge">0</span>
-                    <span id="companiesActiveCount" class="count-badge" style="margin-left:8px; background:#28a745; color:#fff;">
-                        0
-                    </span>
+                 <h2>
+                     Empresas cadastradas
+                     <span id="companiesCount" class="count-badge">0</span>
                 </h2>
-                <div class="small-text" style="margin-top:4px;">
-                    Ativos: Grupo 1 (Simples/Presumido/Real/MEI):
-                    <span id="companiesActiveGroup1Count">0</span>
-                    |
-                    Grupo 2 (Livro Caixa):
-                    <span id="companiesActiveGroup2Count">0</span>
+                <div class="small-text" id="companiesRegimeSummary" style="margin-top:4px;">
+                    Total por regime tributário: -
                 </div>
-                <div id="companiesTable"></div>
-            </div>
-        </section>
+                <div class="small-text" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:12px;">
+                    <div style="min-width:220px;">
+                        <label for="companiesExecutorFilter">Executor responsável</label>
+                        <select id="companiesExecutorFilter" onchange="setCompaniesExecutorFilter(this.value)">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div style="min-width:220px;">
+                        <label for="companiesSectorFilter">Setor</label>
+                        <select id="companiesSectorFilter" onchange="setCompaniesSectorFilter(this.value)">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                </div>
+                 <div id="companiesTable"></div>
+             </div>
+         </section>
 
         <!-- TAREFAS (apenas Gestor) -->
         <section id="tasksSection" class="section">
@@ -1094,6 +1226,23 @@
                             </select>
                         </div>
                     </div>
+                    <div class="flex-row">
+                        <div class="flex-1">
+                            <label for="userPhone">Celular</label>
+                            <input type="tel" id="userPhone" placeholder="(00) 00000-0000">
+                        </div>
+                        <div class="flex-1">
+                            <label for="userSector">Setor</label>
+                            <select id="userSector">
+                                <option value="">Selecione o setor</option>
+                                <option value="BPO Financeiro">BPO Financeiro</option>
+                                <option value="Depto. Contábil/Fiscal">Depto. Contábil/Fiscal</option>
+                                <option value="Depto. Livro Caixa">Depto. Livro Caixa</option>
+                                <option value="Depto. DP">Depto. DP</option>
+                                <option value="Depto. Legalização">Depto. Legalização</option>
+                            </select>
+                        </div>
+                    </div>
                     <button type="submit" id="userSubmitBtn">Salvar usuário</button>
                 </form>
             </div>
@@ -1178,6 +1327,68 @@
     const MAP_BASE_HEIGHT = 800;
     const MAP_MIN_PCT = -20;  // allow arrastar um pouco para fora à esquerda/acima
     const MAP_MAX_PCT = 200;  // permite mais espaço à direita/abaixo
+    const COMPANY_SERVICES = [
+        {
+            key: 'bpo',
+            label: 'BPO Financeiro',
+            checkboxId: 'companyActiveBPO',
+            dateId: 'companyBPOStart',
+            selectId: 'companyOperator',
+            activeField: 'activeBPO',
+            dateField: 'bpoStart',
+            responsibleField: 'operatorResponsible'
+        },
+        {
+            key: 'dp',
+            label: 'DP',
+            checkboxId: 'companyActiveDP',
+            dateId: 'companyDPStart',
+            selectId: 'companyDPResponsible',
+            activeField: 'dpActive',
+            dateField: 'dpStart',
+            responsibleField: 'dpResponsible'
+        },
+        {
+            key: 'contabil',
+            label: 'Contábil',
+            checkboxId: 'companyActiveContabil',
+            dateId: 'companyContabilStart',
+            selectId: 'companyContabilResponsible',
+            activeField: 'contabilActive',
+            dateField: 'contabilStart',
+            responsibleField: 'contabilResponsible'
+        },
+        {
+            key: 'fiscal',
+            label: 'Fiscal',
+            checkboxId: 'companyActiveFiscal',
+            dateId: 'companyFiscalStart',
+            selectId: 'companyFiscalResponsible',
+            activeField: 'fiscalActive',
+            dateField: 'fiscalStart',
+            responsibleField: 'fiscalResponsible'
+        },
+        {
+            key: 'livroCaixa',
+            label: 'Livro Caixa',
+            checkboxId: 'companyActiveLivroCaixa',
+            dateId: 'companyLivroCaixaStart',
+            selectId: 'companyLivroCaixaResponsible',
+            activeField: 'livroCaixaActive',
+            dateField: 'livroCaixaStart',
+            responsibleField: 'livroCaixaResponsible'
+        },
+        {
+            key: 'legalizacao',
+            label: 'Legalização',
+            checkboxId: 'companyActiveLegalizacao',
+            dateId: 'companyLegalizacaoStart',
+            selectId: 'companyLegalizacaoResponsible',
+            activeField: 'legalizacaoActive',
+            dateField: 'legalizacaoStart',
+            responsibleField: 'legalizacaoResponsible'
+        }
+    ];
     let currentUser = null; // { id (email), email, username, role }
 
     let currentMonth;
@@ -1198,15 +1409,28 @@
     let dayTasksSortDirection = 'asc';
     let dayTasksFilterResponsible = '';
     let dayTasksFilterCompanyId = '';
+    let dayTasksFilterSector = '';
+    let companyExecutorFilter = '';
+    let companySectorFilter = '';
 
     const selectedTaskIds = new Set();
 
     // Controle de monitoramento de tarefas em andamento
-    const IN_PROGRESS_LIMIT_MS = 30 * 60 * 1000; // 30 minutos
+    const IN_PROGRESS_LIMIT_MS = 60 * 60 * 1000; // 60 minutos
     const IN_PROGRESS_PROMPT_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos
     let inProgressCheckInterval = null;
     let inProgressPromptState = null; // { taskId, autoTimeout }
     const BASE_PAGE_TITLE = document.title || 'Tarefou-se!';
+    const TASK_FORM_FIELD_IDS = [
+        'taskTitle',
+        'taskDate',
+        'taskUser',
+        'taskCompany',
+        'taskStatus',
+        'taskPriority',
+        'taskDescription',
+        'taskRecurrence'
+    ];
     let titleBlinkInterval = null;
     let swRegistration = null;
     let audioContext = null;
@@ -1257,8 +1481,8 @@
         const title = 'Tarefa em andamento - atencao';
         const options = {
             body: task && task.title
-                ? `A tarefa "${task.title}" esta em andamento ha mais de 30 minutos.`
-                : 'Existe uma tarefa em andamento ha mais de 30 minutos.',
+                ? `A tarefa "${task.title}" esta em andamento ha mais de 60 minutos.`
+                : 'Existe uma tarefa em andamento ha mais de 60 minutos.',
             tag: 'task-in-progress',
             renotify: true,
             icon: 'capivara-login.png',
@@ -1359,9 +1583,28 @@
             const companiesSnapshot = await db.collection('companies').get();
             companiesSnapshot.forEach(doc => {
                 const c = { id: doc.id, ...doc.data() };
-                c.activeBPO = !!c.activeBPO;
-                c.bpoStart = c.bpoStart || '';
-                c.operatorResponsible = c.operatorResponsible || '';
+                const responsiblesSet = new Set(
+                    Array.isArray(c.operatorResponsibles)
+                        ? c.operatorResponsibles
+                            .map(op => (op || '').trim())
+                            .filter(op => !!op)
+                        : []
+                );
+
+                c.municipalRegistration = c.municipalRegistration || '';
+
+                COMPANY_SERVICES.forEach(service => {
+                    c[service.activeField] = !!c[service.activeField];
+                    c[service.dateField] = c[service.dateField] || '';
+                    c[service.responsibleField] = (c[service.responsibleField] || '').trim();
+                    if (c[service.responsibleField]) {
+                        responsiblesSet.add(c[service.responsibleField]);
+                    }
+                });
+
+                c.operatorResponsibles = Array.from(responsiblesSet);
+                const primaryBpo = (c.operatorResponsible || '').trim() || (c.operatorResponsibles[0] || '');
+                c.operatorResponsible = primaryBpo;
                 companies.push(c);
             });
         } catch (e) {
@@ -1390,10 +1633,12 @@
         // Carrega senhas
         try {
             const passwordsSnapshot = await db.collection('passwords').get();
+            const loadedPasswords = [];
             passwordsSnapshot.forEach(doc => {
                 const p = { id: doc.id, ...doc.data() };
-                passwords.push(p);
+                loadedPasswords.push(p);
             });
+            passwords = filterPasswordsForCurrentUser(loadedPasswords);
         } catch (e) {
             console.warn("Erro ao carregar 'passwords':", e);
         }
@@ -1464,6 +1709,17 @@
         if (digits.length > 5) formatted += '.' + digits.slice(5, 8);
         if (digits.length > 8) formatted += '/' + digits.slice(8, 12);
         if (digits.length > 12) formatted += '-' + digits.slice(12, 14);
+        return formatted;
+    }
+
+    function formatMunicipalRegistration(value) {
+        const digits = (value || '').replace(/\D/g, '').slice(0, 8);
+        if (!digits) return '';
+        let formatted = '';
+        if (digits.length >= 1) formatted += digits.slice(0, 1);
+        if (digits.length > 1) formatted += '.' + digits.slice(1, 4);
+        if (digits.length > 4) formatted += '.' + digits.slice(4, 7);
+        if (digits.length > 7) formatted += '-' + digits.slice(7, 8);
         return formatted;
     }
 
@@ -1635,7 +1891,7 @@
         const msgEl = document.getElementById('inProgressModalMessage');
 
         if (msgEl) {
-            msgEl.innerText = `A tarefa "${task.title}" está em andamento há mais de 30 minutos. Ainda está realizando?`;
+            msgEl.innerText = `A tarefa "${task.title}" está em andamento há mais de 60 minutos. Ainda está realizando?`;
         }
 
         if (overlay) {
@@ -1833,7 +2089,9 @@
             id: userDoc.id,
             email: email,
             username: data.username || email,
-            role: data.role || 'Operador'
+            role: data.role || 'Operador',
+            phone: data.phone || '',
+            sector: data.sector || ''
         };
 
         // Agora carrega os dados de acordo com o perfil (Gestor/Operador)
@@ -1934,7 +2192,7 @@
         }
 
         renderUserSelect();
-        renderCompanyOperatorSelect();
+        renderCompanyOperatorSelects();
         renderCompanySelect();
         renderTaskFilterOptions();
         renderTasksTable();
@@ -1948,6 +2206,7 @@
         renderPasswordsTable();
         renderDayTasksResponsibleFilter();
         renderDayTasksCompanyFilter();
+        renderDayTasksSectorFilter();
         if (selectedDate) renderDayTasks(selectedDate);
     }
 
@@ -1955,6 +2214,8 @@
     function resetTaskForm() {
         const form = document.getElementById('taskForm');
         if (form) form.reset();
+
+        setTaskFormFieldsDisabled(TASK_FORM_FIELD_IDS, false);
 
         const taskDateInput = document.getElementById('taskDate');
         if (taskDateInput) taskDateInput.value = getTodayStr();
@@ -1966,7 +2227,10 @@
         if (taskCompanySelect) taskCompanySelect.value = '';
 
         const recurrenceSelect = document.getElementById('taskRecurrence');
-        if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
+        if (recurrenceSelect) {
+            recurrenceSelect.value = 'Nenhuma';
+            recurrenceSelect.disabled = false;
+        }
 
         editingTaskId = null;
 
@@ -1975,8 +2239,76 @@
         document.getElementById('taskCancelBtn').style.display = 'none';
     }
 
+    function setTaskFormFieldsDisabled(fieldIds, disabled) {
+        if (!Array.isArray(fieldIds)) return;
+        fieldIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = !!disabled;
+        });
+    }
+
+    function isTaskRecurring(task) {
+        return !!(task && task.recurrence && task.recurrence !== 'Nenhuma');
+    }
+
+    function applyTaskFormRestrictions(task) {
+        setTaskFormFieldsDisabled(TASK_FORM_FIELD_IDS, false);
+
+        if (!task) return;
+
+        const recurrenceSelect = document.getElementById('taskRecurrence');
+        if (recurrenceSelect && isTaskRecurring(task)) {
+            recurrenceSelect.disabled = true;
+        }
+
+        if (!isResponsibleOperatorForTask(task)) return;
+
+        if (isTaskRecurring(task)) {
+            TASK_FORM_FIELD_IDS.forEach(id => {
+                if (id !== 'taskDescription') {
+                    setTaskFormFieldsDisabled([id], true);
+                }
+            });
+            const desc = document.getElementById('taskDescription');
+            if (desc) desc.disabled = false;
+        } else {
+            setTaskFormFieldsDisabled(['taskUser', 'taskRecurrence'], true);
+        }
+    }
+
     function cancelTaskEdit() {
         resetTaskForm();
+    }
+
+    function getUserByUsername(username) {
+        const normalized = (username || '').toLowerCase();
+        if (!normalized) return null;
+        return users.find(u => (u.username || '').toLowerCase() === normalized) || null;
+    }
+
+    function getSectorByUsername(username) {
+        const user = getUserByUsername(username);
+        return user ? (user.sector || '').trim() : '';
+    }
+
+    function canCurrentUserManageTask(task) {
+        if (!task || !currentUser || currentUser.role !== 'Gestor') return false;
+        const managerSector = (currentUser.sector || '').trim().toLowerCase();
+        const taskSector = (getSectorByUsername(task.responsible) || '').toLowerCase();
+        if (!managerSector || !taskSector) return false;
+        return managerSector === taskSector;
+    }
+
+    function isResponsibleOperatorForTask(task) {
+        if (!task || !currentUser || currentUser.role !== 'Operador') return false;
+        const responsible = (task.responsible || '').trim().toLowerCase();
+        const currentName = (currentUser.username || '').trim().toLowerCase();
+        if (!responsible || !currentName) return false;
+        return responsible === currentName;
+    }
+
+    function canCurrentUserEditTask(task) {
+        return canCurrentUserManageTask(task) || isResponsibleOperatorForTask(task);
     }
 
     // ========================== USUÁRIOS (PERFIS / ROLES) ==========================
@@ -1997,7 +2329,7 @@
         const isGestor = currentUser.role === 'Gestor';
 
         let html = '<div class="table-wrapper"><table><thead><tr>' +
-            '<th>E-mail</th><th>Nome</th><th>Perfil</th>';
+            '<th>E-mail</th><th>Nome</th><th>Celular</th><th>Setor</th><th>Perfil</th>';
         if (isGestor) html += '<th>Ações</th>';
         html += '</tr></thead><tbody>';
 
@@ -2005,6 +2337,8 @@
             html += `<tr>
                 <td>${u.email || u.id}</td>
                 <td>${u.username || '-'}</td>
+                <td>${u.phone || '-'}</td>
+                <td>${u.sector || '-'}</td>
                 <td>${u.role || '-'}</td>`;
             if (isGestor) {
                 html += `<td class="actions">
@@ -2080,11 +2414,15 @@
 
         const emailInput = document.getElementById('userEmail');
         const nameInput = document.getElementById('userName');
+        const phoneInput = document.getElementById('userPhone');
+        const sectorInput = document.getElementById('userSector');
         const roleSelect = document.getElementById('userRole');
         const submitBtn = document.getElementById('userSubmitBtn');
 
         const email = (emailInput.value || '').trim().toLowerCase();
         const name = nameInput.value.trim();
+        const phone = phoneInput ? phoneInput.value.trim() : '';
+        const sector = sectorInput ? sectorInput.value.trim() : '';
         const role = roleSelect.value;
 
         if (!email || !name || !role) {
@@ -2101,10 +2439,14 @@
                 if (u) {
                     u.email = email;
                     u.username = name;
+                    u.phone = phone;
+                    u.sector = sector;
                     u.role = role;
                     await db.collection('users').doc(editingUserId).set({
                         email,
                         username: name,
+                        phone,
+                        sector,
                         role
                     });
                 }
@@ -2115,6 +2457,8 @@
                 await db.collection('users').doc(email).set({
                     email,
                     username: name,
+                    phone,
+                    sector,
                     role
                 });
                 // atualiza cache local sem recarregar tudo
@@ -2122,6 +2466,8 @@
                     id: email,
                     email,
                     username: name,
+                    phone,
+                    sector,
                     role
                 });
             }
@@ -2129,10 +2475,11 @@
             document.getElementById('userForm').reset();
             renderUsersTable();
             renderUserSelect();
-            renderCompanyOperatorSelect();
+            renderCompanyOperatorSelects();
             renderTaskFilterOptions();
             renderDayTasksResponsibleFilter();
             renderDayTasksCompanyFilter();
+            renderDayTasksSectorFilter();
             showCopyToast('Usuário/perfil salvo com sucesso!');
         } catch (e) {
             console.error('Erro ao salvar usuário:', e);
@@ -2155,12 +2502,16 @@
 
         const emailInput = document.getElementById('userEmail');
         const nameInput = document.getElementById('userName');
+        const phoneInput = document.getElementById('userPhone');
+        const sectorInput = document.getElementById('userSector');
         const roleSelect = document.getElementById('userRole');
         const submitBtn = document.getElementById('userSubmitBtn');
 
         emailInput.value = u.email || u.id;
         emailInput.disabled = true;
         nameInput.value = u.username || '';
+        if (phoneInput) phoneInput.value = u.phone || '';
+        if (sectorInput) sectorInput.value = u.sector || '';
         roleSelect.value = u.role || 'Operador';
         submitBtn.textContent = 'Atualizar usuário';
     }
@@ -2180,10 +2531,11 @@
             users = users.filter(us => us.id !== id);
             renderUsersTable();
             renderUserSelect();
-            renderCompanyOperatorSelect();
+            renderCompanyOperatorSelects();
             renderTaskFilterOptions();
             renderDayTasksResponsibleFilter();
             renderDayTasksCompanyFilter();
+            renderDayTasksSectorFilter();
             showCopyToast('Usuario/perfil excluido.');
 
         } catch (e) {
@@ -2193,39 +2545,83 @@
     }
 
     // ========================== EMPRESAS ==========================
-    function renderCompanyOperatorSelect() {
-        const select = document.getElementById('companyOperator');
-        if (!select) return;
-
-        select.innerHTML = '';
-
+    function renderCompanyOperatorSelects() {
         const operators = users.filter(u => (u.role || '').toLowerCase() === 'operador');
 
-        if (!operators.length) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = 'Cadastre operadores na aba Usuários';
-            opt.disabled = true;
-            opt.selected = true;
-            select.appendChild(opt);
-            select.disabled = true;
-            return;
-        }
+        COMPANY_SERVICES.forEach(service => {
+            const select = document.getElementById(service.selectId);
+            if (!select) return;
 
-        select.disabled = false;
+            const previousValue = select.value;
+            select.innerHTML = '';
+
+            if (!operators.length) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Cadastre operadores na aba Usuários';
+                opt.disabled = true;
+                opt.selected = true;
+                select.appendChild(opt);
+                select.disabled = true;
+                return;
+            }
+
+            select.disabled = false;
 
         const placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = 'Selecione o operador responsável';
+        placeholder.textContent = 'Selecione o executor responsável';
         placeholder.disabled = true;
         placeholder.selected = true;
         select.appendChild(placeholder);
 
-        operators.forEach(o => {
-            const opt = document.createElement('option');
-            opt.value = o.username;
-            opt.textContent = o.username + ' (Operador)';
-            select.appendChild(opt);
+            operators.forEach(o => {
+                const opt = document.createElement('option');
+                opt.value = o.username;
+                opt.textContent = o.username + ' (Operador)';
+                select.appendChild(opt);
+            });
+
+            if (previousValue) {
+                select.value = previousValue;
+                if (select.value !== previousValue) {
+                    const fallback = document.createElement('option');
+                    fallback.value = previousValue;
+                    fallback.textContent = previousValue + ' (indisponível)';
+                    select.appendChild(fallback);
+                    select.value = previousValue;
+                }
+            }
+        });
+
+        updateCompanyServiceFields();
+    }
+
+    function updateCompanyServiceFields() {
+        COMPANY_SERVICES.forEach(service => {
+            const checkbox = document.getElementById(service.checkboxId);
+            const dateInput = document.getElementById(service.dateId);
+            const select = document.getElementById(service.selectId);
+            const enabled = !!(checkbox && checkbox.checked);
+
+            if (dateInput) {
+                dateInput.disabled = !enabled;
+            }
+
+            if (select) {
+                if (!enabled) {
+                    if (!select.dataset.disabledByService) {
+                        select.dataset.disabledByService = 'true';
+                        select.dataset.prevDisabled = select.disabled ? 'true' : 'false';
+                    }
+                    select.disabled = true;
+                } else if (select.dataset.disabledByService === 'true') {
+                    const wasDisabled = select.dataset.prevDisabled === 'true';
+                    select.disabled = wasDisabled;
+                    delete select.dataset.prevDisabled;
+                    delete select.dataset.disabledByService;
+                }
+            }
         });
     }
 
@@ -2241,6 +2637,18 @@
         applyMask();
     }
 
+    function applyMunicipalRegistrationMask() {
+        const input = document.getElementById('companyMunicipalRegistration');
+        if (!input) return;
+
+        const applyMask = () => {
+            input.value = formatMunicipalRegistration(input.value);
+        };
+
+        input.addEventListener('input', applyMask);
+        applyMask();
+    }
+
     function handleCompanyForm(event) {
         event.preventDefault();
         if (!currentUser || currentUser.role !== 'Gestor') {
@@ -2250,19 +2658,34 @@
 
         const nameInput = document.getElementById('companyName');
         const cnpjInput = document.getElementById('companyCNPJ');
+        const municipalInput = document.getElementById('companyMunicipalRegistration');
         const regimeSelect = document.getElementById('companyRegime');
-        const operatorSelect = document.getElementById('companyOperator');
-        const activeCheckbox = document.getElementById('companyActiveBPO');
-        const bpoStartInput = document.getElementById('companyBPOStart');
         const submitBtn = document.getElementById('companySubmitBtn');
         const cancelBtn = document.getElementById('companyCancelBtn');
 
         const name = nameInput.value.trim();
         const cnpj = cnpjInput ? cnpjInput.value.trim() : '';
+        const municipalRegistration = municipalInput ? formatMunicipalRegistration(municipalInput.value.trim()) : '';
         const regime = regimeSelect ? regimeSelect.value : '';
-        const operatorResponsible = operatorSelect ? operatorSelect.value : '';
-        const active = !!(activeCheckbox && activeCheckbox.checked);
-        const bpoStart = (bpoStartInput && bpoStartInput.value) ? bpoStartInput.value : '';
+
+        const serviceData = {};
+        const responsiblesSet = new Set();
+        COMPANY_SERVICES.forEach(service => {
+            const checkbox = document.getElementById(service.checkboxId);
+            const dateInput = document.getElementById(service.dateId);
+            const select = document.getElementById(service.selectId);
+            const activeService = !!(checkbox && checkbox.checked);
+            const dateValue = (dateInput && !dateInput.disabled && dateInput.value) ? dateInput.value : '';
+            const responsibleValue = (select && !select.disabled && select.value) ? select.value : '';
+            serviceData[service.key] = {
+                active: activeService,
+                date: activeService ? (dateValue || '') : '',
+                responsible: activeService ? (responsibleValue || '') : ''
+            };
+            if (activeService && responsibleValue) {
+                responsiblesSet.add(responsibleValue);
+            }
+        });
 
         if (!name) {
             alert('Digite o nome da empresa.');
@@ -2274,10 +2697,17 @@
             if (c) {
                 c.name = name;
                 c.cnpj = cnpj || '';
+                c.municipalRegistration = municipalRegistration || '';
                 c.regime = regime || '';
-                c.operatorResponsible = operatorResponsible || '';
-                c.activeBPO = active;
-                c.bpoStart = bpoStart || '';
+                COMPANY_SERVICES.forEach(service => {
+                    const data = serviceData[service.key] || { active: false, date: '', responsible: '' };
+                c[service.activeField] = !!data.active;
+                c[service.dateField] = data.active ? (data.date || '') : '';
+                c[service.responsibleField] = data.active ? (data.responsible || '') : '';
+                });
+                c.operatorResponsibles = Array.from(responsiblesSet);
+                const bpoData = serviceData.bpo || { responsible: '' };
+                c.operatorResponsible = bpoData.responsible || '';
                 try { db.collection('companies').doc(c.id).set(c); } catch (e) {}
             }
             editingCompanyId = null;
@@ -2289,11 +2719,18 @@
                 id: generateId(),
                 name,
                 cnpj: cnpj || '',
-                regime: regime || '',
-                operatorResponsible: operatorResponsible || '',
-                activeBPO: active,
-                bpoStart: bpoStart || ''
+                municipalRegistration: municipalRegistration || '',
+                regime: regime || ''
             };
+            COMPANY_SERVICES.forEach(service => {
+                const data = serviceData[service.key] || { active: false, date: '', responsible: '' };
+                newCompany[service.activeField] = !!data.active;
+                newCompany[service.dateField] = data.active ? (data.date || '') : '';
+                newCompany[service.responsibleField] = data.active ? (data.responsible || '') : '';
+            });
+            newCompany.operatorResponsibles = Array.from(responsiblesSet);
+            const bpoData = serviceData.bpo || { responsible: '' };
+            newCompany.operatorResponsible = bpoData.responsible || '';
             companies.push(newCompany);
             try { db.collection('companies').doc(newCompany.id).set(newCompany); } catch (e) {}
             showCopyToast('Empresa cadastrada com sucesso!');
@@ -2302,12 +2739,10 @@
         document.getElementById('companyForm').reset();
         const reg = document.getElementById('companyRegime');
         if (reg) reg.value = '';
-        const chk = document.getElementById('companyActiveBPO');
-        if (chk) chk.checked = false;
-        const bpo = document.getElementById('companyBPOStart');
-        if (bpo) bpo.value = '';
-        const opSel = document.getElementById('companyOperator');
-        if (opSel) opSel.value = '';
+        const municipal = document.getElementById('companyMunicipalRegistration');
+        if (municipal) municipal.value = '';
+        resetCompanyServiceFields();
+        renderCompanyOperatorSelects();
 
         renderCompaniesTable();
         renderCompanySelect();
@@ -2322,12 +2757,10 @@
 
         const regimeSelect = document.getElementById('companyRegime');
         if (regimeSelect) regimeSelect.value = '';
-        const operatorSelect = document.getElementById('companyOperator');
-        if (operatorSelect) operatorSelect.value = '';
-        const activeCheckbox = document.getElementById('companyActiveBPO');
-        if (activeCheckbox) activeCheckbox.checked = false;
-        const bpoStartInput = document.getElementById('companyBPOStart');
-        if (bpoStartInput) bpoStartInput.value = '';
+        const municipal = document.getElementById('companyMunicipalRegistration');
+        if (municipal) municipal.value = '';
+        resetCompanyServiceFields();
+        renderCompanyOperatorSelects();
 
         const submitBtn = document.getElementById('companySubmitBtn');
         if (submitBtn) submitBtn.textContent = 'Adicionar empresa';
@@ -2335,13 +2768,54 @@
         if (cancelBtn) cancelBtn.style.display = 'none';
     }
 
+    function resetCompanyServiceFields() {
+        COMPANY_SERVICES.forEach(service => {
+            const checkbox = document.getElementById(service.checkboxId);
+            if (checkbox) checkbox.checked = false;
+            const dateInput = document.getElementById(service.dateId);
+            if (dateInput) dateInput.value = '';
+            const select = document.getElementById(service.selectId);
+            if (select) select.value = '';
+        });
+        updateCompanyServiceFields();
+    }
+
+    function fillCompanyServiceFields(company) {
+        COMPANY_SERVICES.forEach(service => {
+            const checkbox = document.getElementById(service.checkboxId);
+            if (checkbox) checkbox.checked = !!company[service.activeField];
+            const dateInput = document.getElementById(service.dateId);
+            if (dateInput) dateInput.value = company[service.dateField] || '';
+        });
+        renderCompanyOperatorSelects();
+        COMPANY_SERVICES.forEach(service => {
+            const select = document.getElementById(service.selectId);
+            if (!select) return;
+            const value = company[service.responsibleField] || '';
+            if (value) {
+                select.value = value;
+                if (select.value !== value) {
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = value + ' (indisponível)';
+                    select.appendChild(opt);
+                    select.value = value;
+                }
+            } else {
+                select.value = '';
+            }
+        });
+        updateCompanyServiceFields();
+    }
+
+
     function renderCompaniesTable() {
         const container = document.getElementById('companiesTable');
         if (!container) return;
+        const companiesCountEl = document.getElementById('companiesCount');
 
         if (!companies.length) {
-            document.getElementById('companiesCount').innerText = '0';
-            document.getElementById('companiesActiveCount').innerText = '0';
+            if (companiesCountEl) companiesCountEl.innerText = '0';
             const g1 = document.getElementById('companiesActiveGroup1Count');
             if (g1) g1.innerText = '0';
             const g2 = document.getElementById('companiesActiveGroup2Count');
@@ -2350,41 +2824,134 @@
             return;
         }
 
-        document.getElementById('companiesCount').innerText = String(companies.length);
-        const activeCount = companies.filter(c => !!c.activeBPO).length;
-        document.getElementById('companiesActiveCount').innerText = String(activeCount);
-        const activeGroup1 = companies.filter(c =>
-            !!c.activeBPO &&
-            ['Simples Nacional', 'Lucro Presumido', 'Lucro Real', 'MEI'].includes(c.regime)
-        ).length;
-        const activeGroup2 = companies.filter(c =>
-            !!c.activeBPO && c.regime === 'Livro Caixa'
-        ).length;
-        const g1 = document.getElementById('companiesActiveGroup1Count');
-        if (g1) g1.innerText = String(activeGroup1);
-        const g2 = document.getElementById('companiesActiveGroup2Count');
-        if (g2) g2.innerText = String(activeGroup2);
-
         const canManageCompanies = currentUser && currentUser.role === 'Gestor';
 
+        const executorSelect = document.getElementById('companiesExecutorFilter');
+        const sectorSelect = document.getElementById('companiesSectorFilter');
+        if (executorSelect) {
+            const executors = Array.from(new Set(
+                companies.flatMap(c => {
+                    const list = [];
+                    if (Array.isArray(c.operatorResponsibles)) {
+                        c.operatorResponsibles.forEach(op => {
+                            const trimmed = (op || '').trim();
+                            if (trimmed) list.push(trimmed);
+                        });
+                    }
+                    const single = (c.operatorResponsible || '').trim();
+                    if (single) list.push(single);
+                    return list;
+                })
+            )).sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+            const current = companyExecutorFilter || '';
+            executorSelect.innerHTML = '';
+            const optAll = document.createElement('option');
+            optAll.value = '';
+            optAll.textContent = 'Todos';
+            executorSelect.appendChild(optAll);
+            executors.forEach(exec => {
+                const opt = document.createElement('option');
+                opt.value = exec;
+                opt.textContent = exec;
+                executorSelect.appendChild(opt);
+            });
+            executorSelect.value = current;
+        }
+        if (sectorSelect) {
+            const current = companySectorFilter || '';
+            sectorSelect.innerHTML = '';
+            const optAll = document.createElement('option');
+            optAll.value = '';
+            optAll.textContent = 'Todos';
+            sectorSelect.appendChild(optAll);
+            COMPANY_SERVICES.forEach(service => {
+                const opt = document.createElement('option');
+                opt.value = service.key;
+                opt.textContent = service.label;
+                sectorSelect.appendChild(opt);
+            });
+            sectorSelect.value = current;
+        }
+
+        const filteredCompanies = companies.filter(c => {
+            if (companyExecutorFilter) {
+                const responsibles = new Set();
+                if (Array.isArray(c.operatorResponsibles)) {
+                    c.operatorResponsibles.forEach(op => {
+                        const trimmed = (op || '').trim();
+                        if (trimmed) responsibles.add(trimmed);
+                    });
+                }
+                const single = (c.operatorResponsible || '').trim();
+                if (single) responsibles.add(single);
+                if (!responsibles.has(companyExecutorFilter)) {
+                    return false;
+                }
+            }
+            if (companySectorFilter) {
+                const service = COMPANY_SERVICES.find(s => s.key === companySectorFilter);
+                if (!service) return true;
+                if (!c[service.activeField]) return false;
+            }
+            return true;
+        });
+
+        if (companiesCountEl) {
+            const companiesWithSelectedSector = filteredCompanies.filter(company =>
+                COMPANY_SERVICES.some(service => !!company[service.activeField])
+            ).length;
+            companiesCountEl.innerText = String(companiesWithSelectedSector);
+        }
+
         let html = '<div class="table-wrapper"><table><thead><tr>' +
-            '<th>Nome</th><th>CNPJ/CPF</th><th>Regime</th><th>Operador responsável</th><th>Cliente ativo</th><th>Início BPO</th>';
+            '<th>Nome</th><th>CNPJ/CPF</th><th>Inscrição Municipal</th><th>Regime</th><th>Executor responsável</th>';
         if (canManageCompanies) html += '<th>Ações</th>';
         html += '</tr></thead><tbody>';
 
-        companies.forEach(c => {
+        const regimeSummaryEl = document.getElementById('companiesRegimeSummary');
+        if (regimeSummaryEl) {
+            const regimeDefinitions = [
+                { value: 'Simples Nacional', label: 'Simples Nacional' },
+                { value: 'Lucro Presumido', label: 'Lucro Presumido' },
+                { value: 'Lucro Real', label: 'Lucro Real' },
+                { value: 'MEI', label: 'MEI' },
+                { value: 'Livro Caixa', label: 'Livro Caixa' }
+            ];
+            const regimeCounts = {};
+            regimeDefinitions.forEach(r => { regimeCounts[r.value] = 0; });
+            let othersCount = 0;
+            filteredCompanies.forEach(c => {
+                const reg = (c.regime || '').trim();
+                if (regimeCounts.hasOwnProperty(reg)) {
+                    regimeCounts[reg] += 1;
+                } else {
+                    othersCount += 1;
+                }
+            });
+            const summaryParts = regimeDefinitions.map(r => `${r.label}: ${regimeCounts[r.value]}`);
+            summaryParts.push(`Outros: ${othersCount}`);
+            const filteredLabel = (companySectorFilter || companyExecutorFilter) ? ' (filtro aplicado)' : '';
+            regimeSummaryEl.textContent = `Total por regime tributário${filteredLabel}: ${summaryParts.join(' | ')}`;
+        }
+
+        if (!filteredCompanies.length) {
+            html += `<tr><td colspan="${canManageCompanies ? 6 : 5}" style="text-align:center; padding:12px;">Nenhuma empresa encontrada com os filtros selecionados.</td></tr>`;
+        } else {
+            filteredCompanies.forEach(c => {
             const cnpjDisplay = formatCnpjCpf(c.cnpj || '') || '-';
+            const municipalDisplay = c.municipalRegistration && c.municipalRegistration.trim()
+                ? formatMunicipalRegistration(c.municipalRegistration)
+                : '-';
             const regimeDisplay = c.regime && c.regime.trim() ? c.regime : '-';
-            const operatorDisplay = c.operatorResponsible && c.operatorResponsible.trim() ? c.operatorResponsible : '-';
-            const activeDisplay = c.activeBPO ? '<strong style="color:#155724;">Sim</strong>' : 'Não';
-            const bpoStartDisplay = c.bpoStart ? formatDateBR(c.bpoStart) : '-';
+            const operatorDisplay = c.operatorResponsible && c.operatorResponsible.trim()
+                ? c.operatorResponsible
+                : '-';
             html += `<tr>
                 <td>${c.name}</td>
                 <td>${cnpjDisplay}</td>
+                <td>${municipalDisplay}</td>
                 <td>${regimeDisplay}</td>
-                <td>${operatorDisplay}</td>
-                <td>${activeDisplay}</td>
-                <td>${bpoStartDisplay}</td>`;
+                <td>${operatorDisplay}</td>`;
             if (canManageCompanies) {
                 html += `<td class="actions">
                     <button onclick="editCompany('${c.id}')">Editar</button>
@@ -2393,8 +2960,19 @@
             }
             html += '</tr>';
         });
+        }
         html += '</tbody></table></div>';
         container.innerHTML = html;
+    }
+
+    function setCompaniesExecutorFilter(value) {
+        companyExecutorFilter = value || '';
+        renderCompaniesTable();
+    }
+
+    function setCompaniesSectorFilter(value) {
+        companySectorFilter = value || '';
+        renderCompaniesTable();
     }
 
     function renderCompanySelect() {
@@ -2445,10 +3023,9 @@
 
         document.getElementById('companyName').value = c.name || '';
         document.getElementById('companyCNPJ').value = formatCnpjCpf(c.cnpj || '');
+        document.getElementById('companyMunicipalRegistration').value = formatMunicipalRegistration(c.municipalRegistration || '');
         document.getElementById('companyRegime').value = c.regime || '';
-        document.getElementById('companyOperator').value = c.operatorResponsible || '';
-        document.getElementById('companyActiveBPO').checked = !!c.activeBPO;
-        document.getElementById('companyBPOStart').value = c.bpoStart || '';
+        fillCompanyServiceFields(c);
         document.getElementById('companySubmitBtn').textContent = 'Atualizar empresa';
         document.getElementById('companyCancelBtn').style.display = 'inline-block';
 
@@ -2634,7 +3211,8 @@
         const status = document.getElementById('taskStatus').value;
         const priority = document.getElementById('taskPriority').value;
         const description = document.getElementById('taskDescription').value.trim();
-        const recurrence = document.getElementById('taskRecurrence').value || 'Nenhuma';
+        const recurrenceSelect = document.getElementById('taskRecurrence');
+        const selectedRecurrence = recurrenceSelect ? (recurrenceSelect.value || 'Nenhuma') : 'Nenhuma';
 
         if (!title || !date || !responsible || !companyId) {
             alert('Preencha todos os campos obrigatórios.');
@@ -2646,7 +3224,39 @@
             if (!task) {
                 alert('Tarefa não encontrada para edição.');
             } else {
-                if (task.recurrence && task.recurrence !== 'Nenhuma') {
+                const canManageTask = canCurrentUserManageTask(task);
+                const canEditAsResponsible = isResponsibleOperatorForTask(task);
+                if (!canManageTask && !canEditAsResponsible) {
+                    alert('Apenas o Gestor do mesmo setor pode editar esta tarefa.');
+                    return;
+                }
+
+                const taskIsRecurring = isTaskRecurring(task);
+                let nextTitle = title;
+                let nextDate = date;
+                let nextResponsible = responsible;
+                let nextCompanyId = companyId;
+                let nextStatus = status;
+                let nextPriority = priority;
+                let nextDescription = description;
+                let recurrenceToApply = taskIsRecurring ? task.recurrence : selectedRecurrence;
+
+                if (canEditAsResponsible) {
+                    if (taskIsRecurring) {
+                        nextTitle = task.title;
+                        nextDate = task.date;
+                        nextResponsible = task.responsible;
+                        nextCompanyId = task.companyId;
+                        nextStatus = task.status;
+                        nextPriority = task.priority;
+                        recurrenceToApply = task.recurrence;
+                    } else {
+                        nextResponsible = task.responsible;
+                        recurrenceToApply = task.recurrence || 'Nenhuma';
+                    }
+                }
+
+                if (taskIsRecurring) {
                     const choice = await showRecurrenceModal(
                         'Esta tarefa faz parte de uma recorrência.\n\nEscolha "Apenas esta tarefa" para aplicar somente nesta data ou "Esta e as futuras" para aplicar a partir desta data em diante.',
                         'Alterar tarefa recorrente'
@@ -2657,36 +3267,36 @@
                     if (choice === 'future') {
                         const series = getFutureSeriesTasks(task, task.date);
                         series.forEach(t => {
-                            applyStatusChange(t, status);
-                            t.title = title;
-                            if (t.id === task.id) t.date = date;
-                            t.responsible = responsible;
-                            t.companyId = companyId;
-                            t.priority = priority;
-                            t.description = description;
-                            t.recurrence = recurrence;
+                            applyStatusChange(t, nextStatus);
+                            t.title = nextTitle;
+                            if (t.id === task.id) t.date = nextDate;
+                            t.responsible = nextResponsible;
+                            t.companyId = nextCompanyId;
+                            t.priority = nextPriority;
+                            t.description = nextDescription;
+                            t.recurrence = recurrenceToApply;
                             try { db.collection('tasks').doc(t.id).set(t); } catch (e) {}
                         });
                     } else {
-                        applyStatusChange(task, status);
-                        task.title = title;
-                        task.date = date;
-                        task.responsible = responsible;
-                        task.companyId = companyId;
-                        task.priority = priority;
-                        task.description = description;
-                        task.recurrence = recurrence;
+                        applyStatusChange(task, nextStatus);
+                        task.title = nextTitle;
+                        task.date = nextDate;
+                        task.responsible = nextResponsible;
+                        task.companyId = nextCompanyId;
+                        task.priority = nextPriority;
+                        task.description = nextDescription;
+                        task.recurrence = recurrenceToApply;
                         try { db.collection('tasks').doc(task.id).set(task); } catch (e) {}
                     }
                 } else {
-                    applyStatusChange(task, status);
-                    task.title = title;
-                    task.date = date;
-                    task.responsible = responsible;
-                    task.companyId = companyId;
-                    task.priority = priority;
-                    task.description = description;
-                    task.recurrence = recurrence;
+                    applyStatusChange(task, nextStatus);
+                    task.title = nextTitle;
+                    task.date = nextDate;
+                    task.responsible = nextResponsible;
+                    task.companyId = nextCompanyId;
+                    task.priority = nextPriority;
+                    task.description = nextDescription;
+                    task.recurrence = recurrenceToApply;
                     try { db.collection('tasks').doc(task.id).set(task); } catch (e) {}
                 }
             }
@@ -2701,7 +3311,7 @@
                 status,
                 priority,
                 description,
-                recurrence,
+                recurrence: selectedRecurrence,
                 timeSpentMs: 0,
                 currentStart: null,
                 baseId: null
@@ -2858,9 +3468,12 @@
             const statusClass = 'tag-' + (t.status || '').replace(/\s+/g, '-');
             const priorityClass = 'tag-' + (t.priority || '');
             const checked = selectedTaskIds.has(t.id) ? 'checked' : '';
+            const manageable = canCurrentUserManageTask(t);
+            if (!manageable) selectedTaskIds.delete(t.id);
+            const disabledAttr = manageable ? '' : 'disabled title="Apenas Gestores do mesmo setor podem selecionar"';
 
             html += `<tr>
-                <td><input type="checkbox" class="task-select-checkbox" data-taskid="${t.id}" ${checked} onchange="toggleTaskSelection(this)"></td>
+                <td><input type="checkbox" class="task-select-checkbox" data-taskid="${t.id}" ${checked} ${disabledAttr} onchange="toggleTaskSelection(this)"></td>
                 <td>${t.title}</td>
                 <td>${formatDateBR(t.date)}</td>
                 <td>${t.responsible}</td>
@@ -2875,14 +3488,21 @@
         container.innerHTML = html;
 
         const delBtn = document.getElementById('deleteSelectedBtn');
-        if (delBtn) delBtn.style.display = (selectedTaskIds.size > 0 && currentUser.role === 'Gestor') ? 'inline-block' : 'inline-block';
+        if (delBtn) {
+            const hasManageableSelection = Array.from(selectedTaskIds).some(id => {
+                const t = tasks.find(task => task.id === id);
+                return t && canCurrentUserManageTask(t);
+            });
+            delBtn.style.display = hasManageableSelection ? 'inline-block' : 'none';
+        }
 
         const selectAll = document.getElementById('selectAllCheckbox');
         if (selectAll) {
-            const allIds = visible.map(v => v.id);
-            const allSelected = allIds.length > 0 && allIds.every(id => selectedTaskIds.has(id));
+            const manageableIds = visible.filter(v => canCurrentUserManageTask(v)).map(v => v.id);
+            const allSelected = manageableIds.length > 0 && manageableIds.every(id => selectedTaskIds.has(id));
             selectAll.checked = allSelected;
             selectAll.indeterminate = selectedTaskIds.size > 0 && !allSelected;
+            selectAll.disabled = manageableIds.length === 0;
         }
     }
 
@@ -2890,8 +3510,11 @@
         const check = el.checked;
         const visible = getFilteredTasksList();
         visible.forEach(t => {
-            if (check) selectedTaskIds.add(t.id);
-            else selectedTaskIds.delete(t.id);
+            if (check) {
+                if (canCurrentUserManageTask(t)) selectedTaskIds.add(t.id);
+            } else {
+                selectedTaskIds.delete(t.id);
+            }
         });
         renderTasksTable();
     }
@@ -2899,14 +3522,23 @@
     function toggleTaskSelection(checkbox) {
         const id = checkbox.getAttribute('data-taskid');
         if (!id) return;
-        if (checkbox.checked) selectedTaskIds.add(id);
-        else selectedTaskIds.delete(id);
+        const task = tasks.find(t => t.id === id);
+        if (checkbox.checked) {
+            if (!task || !canCurrentUserManageTask(task)) {
+                checkbox.checked = false;
+                alert('Apenas o Gestor do mesmo setor pode selecionar esta tarefa.');
+                return;
+            }
+            selectedTaskIds.add(id);
+        } else {
+            selectedTaskIds.delete(id);
+        }
         renderTasksTable();
     }
 
     async function deleteSelectedTasks() {
         if (!currentUser || currentUser.role !== 'Gestor') {
-            alert('Somente Gestores podem excluir tarefas.');
+            alert('Apenas Gestores do mesmo setor podem excluir tarefas.');
             return;
         }
         if (!selectedTaskIds.size) {
@@ -2915,6 +3547,11 @@
         }
 
         const selected = tasks.filter(t => selectedTaskIds.has(t.id));
+        const notManaged = selected.filter(t => !canCurrentUserManageTask(t));
+        if (notManaged.length) {
+            alert('Apenas o Gestor do mesmo setor pode excluir as tarefas selecionadas.');
+            return;
+        }
         if (!selected.length) {
             alert('Nenhuma tarefa válida selecionada.');
             return;
@@ -3014,12 +3651,13 @@
     }
 
     async function deleteTask(id) {
-        if (!currentUser || currentUser.role !== 'Gestor') {
-            alert('Somente Gestores podem excluir tarefas.');
-            return;
-        }
         const t = tasks.find(t => t.id === id);
         if (!t) return;
+
+        if (!canCurrentUserManageTask(t)) {
+            alert('Apenas o Gestor do mesmo setor pode excluir esta tarefa.');
+            return;
+        }
 
         if (t.recurrence && t.recurrence !== 'Nenhuma') {
             const choice = await showRecurrenceModal(
@@ -3272,11 +3910,11 @@
         if (!task) return;
 
         if (!currentUser) {
-            alert('Faça login para alterar o status.');
+            alert('Faca login para alterar o status.');
             return;
         }
-        if (currentUser.role !== 'Gestor' && currentUser.username !== task.responsible) {
-            alert('Você não tem permissão para alterar o status desta tarefa.');
+        if (!canCurrentUserManageTask(task)) {
+            alert('Apenas o Gestor do mesmo setor pode alterar o status desta tarefa.');
             return;
         }
 
@@ -3352,13 +3990,13 @@
         if (!t) return;
 
         if (!currentUser) {
-            alert('Faça login para alterar o status.');
+            alert('Faca login para alterar o status.');
             closeStatusDropdown();
             if (selectedDate) renderDayTasks(selectedDate);
             return;
         }
-        if (currentUser.role !== 'Gestor' && currentUser.username !== t.responsible) {
-            alert('Você não tem permissão para alterar o status desta tarefa.');
+        if (!canCurrentUserManageTask(t)) {
+            alert('Apenas o Gestor do mesmo setor pode alterar o status desta tarefa.');
             closeStatusDropdown();
             if (selectedDate) renderDayTasks(selectedDate);
             return;
@@ -3473,6 +4111,52 @@
         if (selectedDate) renderDayTasks(selectedDate);
     }
 
+    function renderDayTasksSectorFilter() {
+        const container = document.getElementById('dayTasksSectorFilterContainer');
+        const select = document.getElementById('dayTasksSectorFilter');
+        if (!container || !select) return;
+
+        if (!canUseDayTasksFilters()) {
+            container.style.display = 'none';
+            dayTasksFilterSector = '';
+            return;
+        }
+
+        container.style.display = 'block';
+
+        const current = dayTasksFilterSector || '';
+        select.innerHTML = '';
+
+        const optAll = document.createElement('option');
+        optAll.value = '';
+        optAll.textContent = 'Todos';
+        select.appendChild(optAll);
+
+        const sectors = new Set();
+        users.forEach(u => {
+            const sector = (u.sector || '').trim();
+            if (sector) sectors.add(sector);
+        });
+
+        Array.from(sectors).sort().forEach(sec => {
+            const opt = document.createElement('option');
+            opt.value = sec;
+            opt.textContent = sec;
+            select.appendChild(opt);
+        });
+
+        select.value = current;
+        if (select.value !== current) {
+            select.value = '';
+            dayTasksFilterSector = '';
+        }
+    }
+
+    function setDayTasksSectorFilter(value) {
+        dayTasksFilterSector = value || '';
+        if (selectedDate) renderDayTasks(selectedDate);
+    }
+
     function renderDayTasks(dateStr) {
         const container = document.getElementById('dayTasksList');
         const title = document.getElementById('dayTasksTitle');
@@ -3482,6 +4166,13 @@
             if (t.date !== dateStr) return false;
             if (dayTasksFilterResponsible && t.responsible !== dayTasksFilterResponsible) return false;
             if (dayTasksFilterCompanyId && t.companyId !== dayTasksFilterCompanyId) return false;
+            if (dayTasksFilterSector) {
+                const userForTask = users.find(u =>
+                    (u.username || '').toLowerCase() === (t.responsible || '').toLowerCase()
+                );
+                const taskSector = userForTask ? (userForTask.sector || '') : '';
+                if (taskSector !== dayTasksFilterSector) return false;
+            }
             const showCompletedCheckbox = document.getElementById('dayTasksShowCompleted');
             const showCompleted = showCompletedCheckbox && showCompletedCheckbox.checked;
             if (!showCompleted && t.status === 'Concluído') return false;
@@ -3541,11 +4232,11 @@
             visible = sortTasks(visible);
         }
 
-        const titleArrow    = (dayTasksSortField === 'title')       ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
-        const respArrow     = (dayTasksSortField === 'responsible') ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
-        const companyArrow  = (dayTasksSortField === 'company')     ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
-        const statusArrow   = (dayTasksSortField === 'status')      ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
-        const priorityArrow = (dayTasksSortField === 'priority')    ? (dayTasksSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+        const titleArrow    = (dayTasksSortField === 'title')       ? (dayTasksSortDirection === 'asc' ? ' ?' : ' ?') : '';
+        const respArrow     = (dayTasksSortField === 'responsible') ? (dayTasksSortDirection === 'asc' ? ' ?' : ' ?') : '';
+        const companyArrow  = (dayTasksSortField === 'company')     ? (dayTasksSortDirection === 'asc' ? ' ?' : ' ?') : '';
+        const statusArrow   = (dayTasksSortField === 'status')      ? (dayTasksSortDirection === 'asc' ? ' ?' : ' ?') : '';
+        const priorityArrow = (dayTasksSortField === 'priority')    ? (dayTasksSortDirection === 'asc' ? ' ?' : ' ?') : '';
 
         let html = '<div class="table-wrapper"><table><thead><tr>' +
             '<th onclick="setDayTasksSort(\'title\')">Título' + titleArrow + '</th>' +
@@ -3578,6 +4269,10 @@
     function selectTaskForEdit(taskId) {
         const t = tasks.find(t => t.id === taskId);
         if (!t) return;
+        if (!canCurrentUserEditTask(t)) {
+            alert('Apenas o Gestor do mesmo setor pode editar esta tarefa.');
+            return;
+        }
 
         editingTaskId = taskId;
 
@@ -3588,11 +4283,15 @@
         document.getElementById('taskStatus').value = t.status;
         document.getElementById('taskPriority').value = t.priority;
         document.getElementById('taskDescription').value = t.description || '';
-        document.getElementById('taskRecurrence').value = t.recurrence || 'Nenhuma';
+        const recurrenceSelect = document.getElementById('taskRecurrence');
+        if (recurrenceSelect) {
+            recurrenceSelect.value = t.recurrence || 'Nenhuma';
+        }
+        applyTaskFormRestrictions(t);
 
         document.getElementById('taskSubmitBtn').textContent = 'Atualizar tarefa';
         document.getElementById('taskDeleteBtn').style.display =
-            (currentUser && currentUser.role === 'Gestor') ? 'inline-block' : 'none';
+            (currentUser && canCurrentUserManageTask(t)) ? 'inline-block' : 'none';
         document.getElementById('taskCancelBtn').style.display = 'inline-block';
 
         const formEl = document.getElementById('taskForm');
@@ -3691,17 +4390,47 @@
         renderPasswordsTable();
     }
 
+    function getPasswordAccessibleCompanies() {
+        if (!currentUser || currentUser.role === 'Gestor') {
+            return companies;
+        }
+        const operatorName = (currentUser.username || '').trim().toLowerCase();
+        return companies.filter(c => {
+            if (Array.isArray(c.operatorResponsibles)) {
+                if (c.operatorResponsibles.some(op =>
+                    (op || '').trim().toLowerCase() === operatorName
+                )) {
+                    return true;
+                }
+            }
+            return (c.operatorResponsible || '').trim().toLowerCase() === operatorName;
+        });
+    }
+
+    function filterPasswordsForCurrentUser(list) {
+        if (!currentUser || currentUser.role === 'Gestor') {
+            return list;
+        }
+        const allowedIds = new Set(
+            getPasswordAccessibleCompanies().map(c => c.id)
+        );
+        return list.filter(p => allowedIds.has(p.companyId));
+    }
+
     function renderPasswordCompanySelect() {
         const selectForm = document.getElementById('passwordCompanySelect');
         const selectFilter = document.getElementById('passwordCompanyFilter');
+        const availableCompanies = getPasswordAccessibleCompanies();
+        const hasCompanies = availableCompanies.length > 0;
+        const noCompaniesText = companies.length ? 'Nenhuma empresa atribuída' : 'Cadastre empresas primeiro';
 
         if (selectForm) {
             selectForm.innerHTML = '';
 
-            if (!companies.length) {
+            if (!hasCompanies) {
                 const opt = document.createElement('option');
                 opt.value = '';
-                opt.textContent = 'Cadastre empresas primeiro';
+                opt.textContent = noCompaniesText;
                 opt.disabled = true;
                 opt.selected = true;
                 selectForm.appendChild(opt);
@@ -3716,7 +4445,7 @@
                 placeholder.selected = true;
                 selectForm.appendChild(placeholder);
 
-                companies.forEach(c => {
+                availableCompanies.forEach(c => {
                     const opt = document.createElement('option');
                     opt.value = c.id;
                     opt.textContent = c.name;
@@ -3729,19 +4458,32 @@
             const current = selectFilter.value || '';
             selectFilter.innerHTML = '';
 
-            const optAll = document.createElement('option');
-            optAll.value = '';
-            optAll.textContent = 'Todas';
-            selectFilter.appendChild(optAll);
-
-            companies.forEach(c => {
+            if (!hasCompanies) {
                 const opt = document.createElement('option');
-                opt.value = c.id;
-                opt.textContent = c.name;
+                opt.value = '';
+                opt.textContent = noCompaniesText;
+                opt.disabled = true;
+                opt.selected = true;
                 selectFilter.appendChild(opt);
-            });
+                selectFilter.disabled = true;
+            } else {
+                selectFilter.disabled = false;
 
-            selectFilter.value = current;
+                const optAll = document.createElement('option');
+                optAll.value = '';
+                optAll.textContent = 'Todas';
+                selectFilter.appendChild(optAll);
+
+                availableCompanies.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name;
+                    selectFilter.appendChild(opt);
+                });
+
+                const exists = availableCompanies.some(c => c.id === current);
+                selectFilter.value = exists ? current : '';
+            }
         }
     }
 
@@ -3803,6 +4545,14 @@
             return;
         }
 
+        const allowedCompanies = getPasswordAccessibleCompanies();
+        const restrictToOperatorCompanies = currentUser && currentUser.role === 'Operador';
+
+        if (restrictToOperatorCompanies && !allowedCompanies.length) {
+            container.innerHTML = '<p class="small-text">Nenhuma empresa atribuída ao seu usuário para visualizar senhas.</p>';
+            return;
+        }
+
         if (!passwords.length) {
             container.innerHTML = '<p class="small-text">Nenhuma senha cadastrada.</p>';
             return;
@@ -3810,8 +4560,12 @@
 
         const filterSelect = document.getElementById('passwordCompanyFilter');
         const filterCompanyId = filterSelect ? (filterSelect.value || '') : '';
+        const allowedIds = new Set(allowedCompanies.map(c => c.id));
 
         let list = passwords.slice();
+        if (restrictToOperatorCompanies) {
+            list = list.filter(p => allowedIds.has(p.companyId));
+        }
         if (filterCompanyId) {
             list = list.filter(p => p.companyId === filterCompanyId);
         }
@@ -3867,8 +4621,7 @@
         html += '</tbody></table></div>';
         container.innerHTML = html;
     }
-
-    function editPassword(id) {
+function editPassword(id) {
         if (!currentUser || currentUser.role !== 'Gestor') {
             alert('Apenas Gestores podem editar senhas.');
             return;
@@ -4520,6 +5273,14 @@
         document.getElementById('taskForm').addEventListener('submit', handleTaskForm);
 
         applyCompanyCnpjMask();
+        applyMunicipalRegistrationMask();
+        COMPANY_SERVICES.forEach(service => {
+            const checkbox = document.getElementById(service.checkboxId);
+            if (checkbox) {
+                checkbox.addEventListener('change', updateCompanyServiceFields);
+            }
+        });
+        updateCompanyServiceFields();
         document.addEventListener('mousemove', handleMapNodeDrag);
         document.addEventListener('mouseup', stopMapNodeDrag);
 
@@ -4582,13 +5343,14 @@
         const recurrenceSelect = document.getElementById('taskRecurrence');
         if (recurrenceSelect) recurrenceSelect.value = 'Nenhuma';
 
-        renderCompanyOperatorSelect();
+        renderCompanyOperatorSelects();
         renderPasswordCompanySelect();
         renderCompaniesTable();
         renderUsersTable();
         renderTaskFilterOptions();
         renderDayTasksResponsibleFilter();
         renderDayTasksCompanyFilter();
+        renderDayTasksSectorFilter();
         renderCalendar();
 
         // Atualiza lista de tarefas do dia ao marcar/desmarcar "Mostrar concluídas"
@@ -4612,16 +5374,3 @@
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
