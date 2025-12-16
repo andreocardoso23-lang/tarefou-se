@@ -2187,6 +2187,10 @@
             document.getElementById('nav-users').classList.add('active');
         }
 
+        if (sectionId === 'companiesSection') {
+            enforceOperatorCompanySectorFilter();
+        }
+
         const passwordForm = document.getElementById('passwordForm');
         if (passwordForm && currentUser) {
             passwordForm.style.display = currentUser.role === 'Gestor' ? 'block' : 'none';
@@ -2276,14 +2280,16 @@
 
         if (isTaskRecurring(task)) {
             TASK_FORM_FIELD_IDS.forEach(id => {
-                if (id !== 'taskDescription') {
+                if (id !== 'taskDescription' && id !== 'taskStatus') {
                     setTaskFormFieldsDisabled([id], true);
                 }
             });
             const desc = document.getElementById('taskDescription');
             if (desc) desc.disabled = false;
+            const statusSelect = document.getElementById('taskStatus');
+            if (statusSelect) statusSelect.disabled = false;
         } else {
-            setTaskFormFieldsDisabled(['taskUser', 'taskRecurrence'], true);
+            setTaskFormFieldsDisabled(['taskUser', 'taskCompany'], true);
         }
     }
 
@@ -2825,6 +2831,11 @@
         if (!container) return;
         const companiesCountEl = document.getElementById('companiesCount');
 
+        const isOperatorUser = currentUser && currentUser.role === 'Operador';
+        if (isOperatorUser) {
+            enforceOperatorCompanySectorFilter();
+        }
+
         if (!companies.length) {
             if (companiesCountEl) companiesCountEl.innerText = '0';
             const g1 = document.getElementById('companiesActiveGroup1Count');
@@ -2869,6 +2880,9 @@
             executorSelect.value = current;
         }
         if (sectorSelect) {
+            if (isOperatorUser) {
+                enforceOperatorCompanySectorFilter();
+            }
             const current = companySectorFilter || '';
             sectorSelect.innerHTML = '';
             const optAll = document.createElement('option');
@@ -2882,6 +2896,7 @@
                 sectorSelect.appendChild(opt);
             });
             sectorSelect.value = current;
+            sectorSelect.disabled = !!isOperatorUser;
         }
 
         const filteredCompanies = companies.filter(c => {
@@ -2982,8 +2997,57 @@
     }
 
     function setCompaniesSectorFilter(value) {
+        if (currentUser && currentUser.role === 'Operador') {
+            enforceOperatorCompanySectorFilter();
+            renderCompaniesTable();
+            return;
+        }
         companySectorFilter = value || '';
         renderCompaniesTable();
+    }
+
+    function normalizeText(value) {
+        if (!value) return '';
+        return value
+            .toString()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]/g, '');
+    }
+
+    function getCompanyServiceKeyFromSectorName(sectorName) {
+        const normalizedSector = normalizeText(sectorName);
+        if (!normalizedSector) return '';
+
+        for (const service of COMPANY_SERVICES) {
+            if (normalizeText(service.label) === normalizedSector) {
+                return service.key;
+            }
+        }
+
+        for (const service of COMPANY_SERVICES) {
+            const normalizedLabel = normalizeText(service.label);
+            if (!normalizedLabel) continue;
+            if (
+                normalizedSector.includes(normalizedLabel) ||
+                normalizedLabel.includes(normalizedSector)
+            ) {
+                return service.key;
+            }
+        }
+
+        const aliasMap = {
+            deptocontabilfiscal: 'contabil'
+        };
+        return aliasMap[normalizedSector] || '';
+    }
+
+    function enforceOperatorCompanySectorFilter() {
+        if (!currentUser || currentUser.role !== 'Operador') return;
+        const sectorKey = getCompanyServiceKeyFromSectorName(currentUser.sector || '');
+        if (!sectorKey) return;
+        companySectorFilter = sectorKey;
     }
 
     function renderCompanySelect() {
@@ -3258,12 +3322,11 @@
                         nextDate = task.date;
                         nextResponsible = task.responsible;
                         nextCompanyId = task.companyId;
-                        nextStatus = task.status;
                         nextPriority = task.priority;
                         recurrenceToApply = task.recurrence;
                     } else {
                         nextResponsible = task.responsible;
-                        recurrenceToApply = task.recurrence || 'Nenhuma';
+                        nextCompanyId = task.companyId;
                     }
                 }
 
@@ -3924,8 +3987,8 @@
             alert('Faca login para alterar o status.');
             return;
         }
-        if (!canCurrentUserManageTask(task)) {
-            alert('Apenas o Gestor do mesmo setor pode alterar o status desta tarefa.');
+        if (!canCurrentUserManageTask(task) && !isResponsibleOperatorForTask(task)) {
+            alert('Apenas o Gestor do mesmo setor ou o responsavel pela tarefa pode alterar o status.');
             return;
         }
 
@@ -4006,8 +4069,8 @@
             if (selectedDate) renderDayTasks(selectedDate);
             return;
         }
-        if (!canCurrentUserManageTask(t)) {
-            alert('Apenas o Gestor do mesmo setor pode alterar o status desta tarefa.');
+        if (!canCurrentUserManageTask(t) && !isResponsibleOperatorForTask(t)) {
+            alert('Apenas o Gestor do mesmo setor ou o responsavel pela tarefa pode alterar o status.');
             closeStatusDropdown();
             if (selectedDate) renderDayTasks(selectedDate);
             return;
